@@ -10,24 +10,24 @@ class OfflineGeo {
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
-    return perm == LocationPermission.always || perm == LocationPermission.whileInUse;
+    return perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse;
   }
 
   /// Coordenadas offline con buena UX:
   /// 1) devuelve rápido el lastKnown si existe
   /// 2) intenta un fix de GPS con alta precisión y timeout
-  static Future<Position?> current({Duration timeout = const Duration(seconds: 25)}) async {
-    // 1) rápido si hay cache
+  static Future<Position?> current({
+    Duration timeout = const Duration(seconds: 25),
+  }) async {
     final last = await Geolocator.getLastKnownPosition();
-    // 2) pedir fix preciso (GPS). En ^10.x se usa desiredAccuracy
     try {
       final pos = await Geolocator.getCurrentPosition(
+        // En geolocator 10.x esto sigue válido:
         desiredAccuracy: LocationAccuracy.high,
       ).timeout(timeout);
-      // Si había last y era “reciente”, podés decidir cuál preferir
       return pos;
     } on TimeoutException {
-      // si no logró fix en tiempo, devolvé lo que tengas
       return last;
     } catch (_) {
       return last;
@@ -39,9 +39,12 @@ class OfflineGeo {
     LocationAccuracy accuracy = LocationAccuracy.high,
     int distanceFilterMeters = 5,
   }) {
+    // En geolocator 10.x+ usar LocationSettings
     return Geolocator.getPositionStream(
-      desiredAccuracy: accuracy,
-      distanceFilter: distanceFilterMeters,
+      locationSettings: LocationSettings(
+        accuracy: accuracy,
+        distanceFilter: distanceFilterMeters,
+      ),
     );
   }
 }
