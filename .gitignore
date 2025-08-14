@@ -1,32 +1,30 @@
-### IntelliJ IDEA ###
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+﻿# Flutter/Dart
+.dart_tool/
+build/
+coverage/
+.flutter-plugins
+.flutter-plugins-dependencies
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Android
+android/.gradle/
+android/local.properties
+android/build/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# iOS/macOS
+ios/Pods/
+ios/Flutter/ephemeral/
+macos/Pods/
+macos/Flutter/ephemeral/
 
-### VS Code ###
+# Windows/Linux
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# IDEs
+.idea/
 .vscode/
+**/*.iml
 
-### Mac OS ###
-.DS_Store
-
-# FVM Version Cache
-.fvm/
+# Keystores
+*.jks
+*.keystore
