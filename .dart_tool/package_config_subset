@@ -462,6 +462,10 @@ pool
 2.12
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/pool-1.5.1/
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/pool-1.5.1/lib/
+process
+3.3
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/process-5.0.3/
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/process-5.0.3/lib/
 proj4dart
 2.12
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/proj4dart-2.1.0/
@@ -554,6 +558,10 @@ string_scanner
 3.1
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/string_scanner-1.4.1/
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/string_scanner-1.4.1/lib/
+sync_http
+2.12
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/sync_http-0.3.1/
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/sync_http-0.3.1/lib/
 syncfusion_flutter_core
 2.17
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/syncfusion_flutter_core-25.2.7/
@@ -630,6 +638,10 @@ vector_math
 2.14
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/vector_math-2.1.4/
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/vector_math-2.1.4/lib/
+very_good_analysis
+3.0
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/very_good_analysis-5.1.0/
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/very_good_analysis-5.1.0/lib/
 vm_service
 3.3
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/vm_service-15.0.0/
@@ -650,6 +662,10 @@ web_socket_channel
 3.3
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/web_socket_channel-3.0.3/
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/web_socket_channel-3.0.3/lib/
+webdriver
+3.1
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/webdriver-3.1.0/
+file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/webdriver-3.1.0/lib/
 win32
 3.8
 file:///C:/Users/marco/AppData/Local/Pub/Cache/hosted/pub.dev/win32-5.14.0/
@@ -686,6 +702,10 @@ flutter
 3.7
 file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter/
 file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter/lib/
+flutter_driver
+3.7
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter_driver/
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter_driver/lib/
 flutter_test
 3.7
 file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter_test/
@@ -694,4 +714,12 @@ flutter_web_plugins
 3.7
 file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter_web_plugins/
 file:///C:/flutter_windows_3.32.7-stable/flutter/packages/flutter_web_plugins/lib/
+fuchsia_remote_debug_protocol
+3.7
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/fuchsia_remote_debug_protocol/
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/fuchsia_remote_debug_protocol/lib/
+integration_test
+3.7
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/integration_test/
+file:///C:/flutter_windows_3.32.7-stable/flutter/packages/integration_test/lib/
 2

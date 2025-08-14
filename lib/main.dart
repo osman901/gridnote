@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'theme/gridnote_theme.dart';
 import 'screens/initial_loading_screen.dart';
-import 'screens/measurement_screen.dart';
+import 'screens/measurements_screen.dart'; // <-- actualizado
 import 'models/measurement.dart';
 import 'models/sheet_meta.dart';
 
@@ -51,15 +51,24 @@ Future<void> _boot() async {
 
 List<Measurement> _demoMeasurements() => [
   Measurement(
-    progresiva: 'A-01', ohm1m: 1.2, ohm3m: 3.4,
-    observations: 'OK', date: DateTime.now().subtract(const Duration(days: 2)),
+    progresiva: 'A-01',
+    ohm1m: 1.2,
+    ohm3m: 3.4,
+    observations: 'OK',
+    date: DateTime.now().subtract(const Duration(days: 2)),
   ),
   Measurement(
-    progresiva: 'A-02', ohm1m: 0.9, ohm3m: 2.8,
-    observations: 'Vibración leve', date: DateTime.now().subtract(const Duration(days: 1)),
+    progresiva: 'A-02',
+    ohm1m: 0.9,
+    ohm3m: 2.8,
+    observations: 'Vibración leve',
+    date: DateTime.now().subtract(const Duration(days: 1)),
   ),
   Measurement(
-    progresiva: 'A-03', ohm1m: 1.5, ohm3m: 3.1,
-    observations: '', date: DateTime.now(),
+    progresiva: 'A-03',
+    ohm1m: 1.5,
+    ohm3m: 3.1,
+    observations: '',
+    date: DateTime.now(),
   ),
 ];
