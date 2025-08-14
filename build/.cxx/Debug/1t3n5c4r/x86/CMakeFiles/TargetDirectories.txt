@@ -1,0 +1,2 @@
+C:/Users/marco/StudioProjects/Gridnote/build/.cxx/Debug/1t3n5c4r/x86/CMakeFiles/edit_cache.dir
+C:/Users/marco/StudioProjects/Gridnote/build/.cxx/Debug/1t3n5c4r/x86/CMakeFiles/rebuild_cache.dir
