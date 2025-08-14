@@ -5,7 +5,6 @@ class MeasurementNotifier extends StateNotifier<List<Measurement>> {
   MeasurementNotifier() : super(const []);
 
   void setAll(List<Measurement> list) => state = List.unmodifiable(list);
-
   void add(Measurement m) => state = [...state, m];
 
   void removeAt(int index) {

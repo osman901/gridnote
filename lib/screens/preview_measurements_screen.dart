@@ -21,7 +21,8 @@ class PreviewMeasurementsScreen extends StatefulWidget {
   });
 
   @override
-  State<PreviewMeasurementsScreen> createState() => _PreviewMeasurementsScreenState();
+  State<PreviewMeasurementsScreen> createState() =>
+      _PreviewMeasurementsScreenState();
 }
 
 class _PreviewMeasurementsScreenState extends State<PreviewMeasurementsScreen> {
@@ -40,16 +41,21 @@ class _PreviewMeasurementsScreenState extends State<PreviewMeasurementsScreen> {
   Future<bool> _confirmDiscardIfNeeded() async {
     if (widget.readOnly || !_dirty) return true;
     final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Descartar cambios'),
-        content: const Text('Tenés cambios sin guardar. ¿Querés salir igualmente?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salir')),
-        ],
-      ),
-    ) ??
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Descartar cambios'),
+            content: const Text(
+                'Tenés cambios sin guardar. ¿Querés salir igualmente?'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Salir')),
+            ],
+          ),
+        ) ??
         false;
     return ok;
   }
@@ -65,12 +71,14 @@ class _PreviewMeasurementsScreenState extends State<PreviewMeasurementsScreen> {
   }
 
   void _saveAndClose() {
-    Navigator.pop<List<Measurement>>(context, List<Measurement>.unmodifiable(_editable));
+    Navigator.pop<List<Measurement>>(
+        context, List<Measurement>.unmodifiable(_editable));
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.readOnly ? 'Vista previa de mediciones' : 'Editar mediciones';
+    final title =
+        widget.readOnly ? 'Vista previa de mediciones' : 'Editar mediciones';
 
     return WillPopScope(
       onWillPop: _confirmDiscardIfNeeded,
@@ -89,21 +97,21 @@ class _PreviewMeasurementsScreenState extends State<PreviewMeasurementsScreen> {
         body: _editable.isEmpty
             ? const Center(child: Text('No hay mediciones para mostrar.'))
             : Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: EditableMeasurementTable(
-            // Importante: pasamos la copia local, no la lista original.
-            measurements: _editable,
-            onChanged: _onTableChanged,
-            // Si tu tabla soporta modo lectura, podés pasar:
-            // readOnly: widget.readOnly,
-          ),
-        ),
+                padding: const EdgeInsets.all(8.0),
+                child: EditableMeasurementTable(
+                  // Importante: pasamos la copia local, no la lista original.
+                  measurements: _editable,
+                  onChanged: _onTableChanged,
+                  // Si tu tabla soporta modo lectura, podés pasar:
+                  // readOnly: widget.readOnly,
+                ),
+              ),
         floatingActionButton: (!widget.readOnly && _dirty)
             ? FloatingActionButton.extended(
-          onPressed: _saveAndClose,
-          icon: const Icon(Icons.check),
-          label: const Text('Guardar'),
-        )
+                onPressed: _saveAndClose,
+                icon: const Icon(Icons.check),
+                label: const Text('Guardar'),
+              )
             : null,
       ),
     );

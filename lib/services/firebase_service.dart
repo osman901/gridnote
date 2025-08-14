@@ -9,6 +9,8 @@ class FirebaseService {
 
   static Future<List<Map<String, dynamic>>> obtenerPlanillas() async {
     final snapshot = await _db.collection('planillas').get();
-    return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    return snapshot.docs
+        .map((doc) => doc.data())
+        .toList();
   }
 }

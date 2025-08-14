@@ -48,11 +48,7 @@ class ExcelExportService {
 
     // Bordes finos en toda el área con datos
     final lastRow = rows.length + 1; // incluye header
-    ws
-        .getRangeByIndex(1, 1, lastRow, headers.length)
-        .cellStyle
-        .borders
-        .all
+    ws.getRangeByIndex(1, 1, lastRow, headers.length).cellStyle.borders.all
       ..lineStyle = xlsio.LineStyle.hair
       ..color = '#E6E9EF';
 
@@ -64,19 +60,21 @@ class ExcelExportService {
 
     // ===== Estadísticas columnas B y C (ohm1m / ohm3m) =====
     if (rows.isNotEmpty) {
-      final start = 2;               // primera fila de datos
-      final end = rows.length + 1;   // última fila de datos
-      var r0 = end + 2;              // fila inicial de stats (espacio en blanco)
+      const start = 2; // primera fila de datos
+      final end = rows.length + 1; // última fila de datos
+      var r0 = end + 2; // fila inicial de stats (espacio en blanco)
 
       ws.getRangeByIndex(r0 - 1, 1).setText('Estadísticas');
 
       void statRow(String label, String func, {bool isMode = false}) {
         ws.getRangeByIndex(r0, 1).setText(label);
 
-        final bFormula =
-        isMode ? 'IFERROR(MODE.SNGL(B$start:B$end),"—")' : '$func(B$start:B$end)';
-        final cFormula =
-        isMode ? 'IFERROR(MODE.SNGL(C$start:C$end),"—")' : '$func(C$start:C$end)';
+        final bFormula = isMode
+            ? 'IFERROR(MODE.SNGL(B$start:B$end),"—")'
+            : '$func(B$start:B$end)';
+        final cFormula = isMode
+            ? 'IFERROR(MODE.SNGL(C$start:C$end),"—")'
+            : '$func(C$start:C$end)';
 
         ws.getRangeByIndex(r0, 2).setFormula(bFormula);
         ws.getRangeByIndex(r0, 3).setFormula(cFormula);
@@ -89,10 +87,10 @@ class ExcelExportService {
         r0++;
       }
 
-      statRow('Máximo',   'MAX');
-      statRow('Mínimo',   'MIN');
+      statRow('Máximo', 'MAX');
+      statRow('Mínimo', 'MIN');
       statRow('Promedio', 'AVERAGE');
-      statRow('Moda',     '', isMode: true);
+      statRow('Moda', '', isMode: true);
     }
 
     // Guardar

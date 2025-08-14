@@ -17,8 +17,12 @@ class SheetsStore extends ChangeNotifier {
     } else {
       // Semilla demo si está vacío
       _all.addAll([
-        SheetMeta(id: DateTime.now().millisecondsSinceEpoch.toString(), name: 'Planilla 1'),
-        SheetMeta(id: (DateTime.now().millisecondsSinceEpoch + 109).toString(), name: 'rrr'),
+        SheetMeta(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            name: 'Planilla 1'),
+        SheetMeta(
+            id: (DateTime.now().millisecondsSinceEpoch + 109).toString(),
+            name: 'rrr'),
       ]);
       await _persist();
     }
@@ -30,8 +34,8 @@ class SheetsStore extends ChangeNotifier {
     await sp.setString(_kKey, SheetMeta.encodeList(_all));
   }
 
-  SheetMeta? byId(String id) =>
-      _all.firstWhere((e) => e.id == id, orElse: () => SheetMeta(id: id, name: 'Planilla'));
+  SheetMeta? byId(String id) => _all.firstWhere((e) => e.id == id,
+      orElse: () => SheetMeta(id: id, name: 'Planilla'));
 
   Future<void> rename(String id, String name) async {
     final i = _all.indexWhere((e) => e.id == id);

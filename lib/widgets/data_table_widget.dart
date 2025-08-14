@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class DataTableWidget extends StatelessWidget {
@@ -12,10 +11,10 @@ class DataTableWidget extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        headingRowColor: MaterialStateProperty.all(Colors.grey[900]),
+        headingRowColor: WidgetStateProperty.all(Colors.grey[900]),
         columns: columns,
         rows: rows,
-        dataRowColor: MaterialStateProperty.all(Colors.black),
+        dataRowColor: WidgetStateProperty.all(Colors.black),
         columnSpacing: 20,
         dividerThickness: 1,
       ),

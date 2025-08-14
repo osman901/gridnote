@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -30,14 +29,23 @@ class MeasurementExcelService {
     );
 
     final tmpDir = await getTemporaryDirectory();
-    final ts = DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '');
-    final fileName = (suggestedFileName.isEmpty ? 'planilla_$ts' : '${suggestedFileName}_$ts') + '.xlsx';
+    final ts = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '')
+        .replaceAll('.', '');
+    final fileName = '${suggestedFileName.isEmpty
+            ? 'planilla_$ts'
+            : '${suggestedFileName}_$ts'}.xlsx';
     final file = File(p.join(tmpDir.path, fileName));
     await file.writeAsBytes(bytes, flush: true);
 
     // ignore: deprecated_member_use
     await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+      [
+        XFile(file.path,
+            mimeType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      ],
       subject: 'Gridnote – Reporte XLSX',
       text: 'Adjunto Excel generado desde Gridnote.',
     );
@@ -83,7 +91,8 @@ class MeasurementExcelService {
 
       // Col 5: Fecha (texto dd/MM/yyyy)
       final d = m.date;
-      final fecha = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+      final fecha =
+          '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
       sheet.getRangeByIndex(i + 2, 5).setText(fecha);
     }
 

@@ -25,7 +25,7 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
   bool _isScanning = true;
 
   Map<String, dynamic>? _lastPayload;
-  String? _status;   // "valido" | "invalido" | "error"
+  String? _status; // "valido" | "invalido" | "error"
   String? _message;
 
   @override
@@ -95,17 +95,16 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
     }
 
     // 4) Construcción canónica estricta (todas las claves deben existir)
-    final canonical =
-        '${obj['p']}|${obj['r1']}|${obj['r3']}|${obj['obs']}|'
+    final canonical = '${obj['p']}|${obj['r1']}|${obj['r3']}|${obj['obs']}|'
         '${obj['lat']}|${obj['lon']}|${obj['dt']}';
 
     // 5) Cargar secreto (sin fallback hardcodeado)
     final secret = await _loadSecret();
     if (secret == null || secret.isEmpty) {
       return (
-      'error',
-      'Error de configuración: no hay secreto definido para verificar firmas.',
-      obj
+        'error',
+        'Error de configuración: no hay secreto definido para verificar firmas.',
+        obj
       );
     }
 
@@ -122,7 +121,11 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
     }
 
     final ok = _ctEquals(expected, sigBytes);
-    return (ok ? 'valido' : 'invalido', ok ? 'Firma válida' : 'Firma inválida', obj);
+    return (
+      ok ? 'valido' : 'invalido',
+      ok ? 'Firma válida' : 'Firma inválida',
+      obj
+    );
   }
 
   Future<String?> _loadSecret() async {
@@ -195,7 +198,9 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
             onDetect: _onDetect,
           ),
           Positioned(
-            left: 0, right: 0, bottom: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -204,11 +209,15 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _status == null ? 'Apuntá a un QR de Gridnote' : _status!.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                    _status == null
+                        ? 'Apuntá a un QR de Gridnote'
+                        : _status!.toUpperCase(),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, color: Colors.white),
                   ),
                   if (_message != null)
-                    Text(_message!, style: const TextStyle(color: Colors.white)),
+                    Text(_message!,
+                        style: const TextStyle(color: Colors.white)),
                   if (_lastPayload != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -216,7 +225,8 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
                         _lastPayload.toString(),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12),
                       ),
                     ),
                 ],
@@ -238,19 +248,19 @@ class _QrVerifyScreenState extends State<QrVerifyScreen> {
       ),
       floatingActionButton: !_isScanning
           ? FloatingActionButton.extended(
-        onPressed: () {
-          setState(() {
-            _status = null;
-            _message = null;
-            _lastPayload = null;
-            _processing = false;
-          });
-          _scanner.start();
-          _isScanning = true;
-        },
-        icon: const Icon(Icons.qr_code_scanner),
-        label: const Text('Escanear de nuevo'),
-      )
+              onPressed: () {
+                setState(() {
+                  _status = null;
+                  _message = null;
+                  _lastPayload = null;
+                  _processing = false;
+                });
+                _scanner.start();
+                _isScanning = true;
+              },
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Escanear de nuevo'),
+            )
           : null,
     );
   }

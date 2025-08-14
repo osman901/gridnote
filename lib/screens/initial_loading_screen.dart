@@ -79,8 +79,8 @@ class _ShimmerText extends StatefulWidget {
 
 class _ShimmerTextState extends State<_ShimmerText>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-  AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1600))
     ..repeat();
 
   @override

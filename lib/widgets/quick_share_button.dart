@@ -34,13 +34,22 @@ class _QuickShareButtonState extends State<QuickShareButton> {
   List<String> _suggestions = [];
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
+
   Future<void> _load() async {
     _suggestions = await _store.getAll();
     if (_suggestions.isNotEmpty) _emailCtrl.text = _suggestions.first;
     if (mounted) setState(() {});
   }
-  @override void dispose() { _emailCtrl.dispose(); super.dispose(); }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
 
   bool _valid(String s) => RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(s);
 
@@ -54,59 +63,80 @@ class _QuickShareButtonState extends State<QuickShareButton> {
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 8,
+            left: 16,
+            right: 16,
+            top: 8,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Enviar planilla por correo', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                  labelText: 'Correo frecuente', hintText: 'nombre@empresa.com'
-              ),
-              autofocus: true,
-            ),
-            if (_suggestions.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _suggestions.map((e) =>
-                    ActionChip(label: Text(e), onPressed: () => _emailCtrl.text = e)
-                ).toList(),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(children: [
-              ElevatedButton.icon(
-                onPressed: _sending ? null : () async {
-                  final email = _emailCtrl.text.trim();
-                  if (!_valid(email)) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresá un correo válido')));
-                    return;
-                  }
-                  Navigator.of(ctx).pop();
-                  setState(() => _sending = true);
-                  try {
-                    final rows = await widget.loadRows();
-                    await _mail.sendSheet(meta: widget.meta, rows: rows, toEmail: email);
-                    await _store.add(email);
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Abriendo correo para ${widget.meta.name}…')),
-                    );
-                  } finally {
-                    if (mounted) setState(() => _sending = false);
-                  }
-                },
-                icon: const ExcelBadgeIcon(size: 18),
-                label: const Text('Enviar Excel'),
-              ),
-              const SizedBox(width: 12),
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
-            ]),
-          ]),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Enviar planilla por correo',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                      labelText: 'Correo frecuente',
+                      hintText: 'nombre@empresa.com'),
+                  autofocus: true,
+                ),
+                if (_suggestions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _suggestions
+                        .map((e) => ActionChip(
+                            label: Text(e),
+                            onPressed: () => _emailCtrl.text = e))
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(children: [
+                  ElevatedButton.icon(
+                    onPressed: _sending
+                        ? null
+                        : () async {
+                            final email = _emailCtrl.text.trim();
+                            if (!_valid(email)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content:
+                                          Text('Ingresá un correo válido')));
+                              return;
+                            }
+                            Navigator.of(ctx).pop();
+                            setState(() => _sending = true);
+                            try {
+                              final rows = await widget.loadRows();
+                              await _mail.sendSheet(
+                                  meta: widget.meta,
+                                  rows: rows,
+                                  toEmail: email);
+                              await _store.add(email);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(
+                                        'Abriendo correo para ${widget.meta.name}…')),
+                              );
+                            } finally {
+                              if (mounted) setState(() => _sending = false);
+                            }
+                          },
+                    icon: const ExcelBadgeIcon(size: 18),
+                    label: const Text('Enviar Excel'),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancelar')),
+                ]),
+              ]),
         );
       },
     );
@@ -123,19 +153,19 @@ class _QuickShareButtonState extends State<QuickShareButton> {
 
     return widget.compact
         ? IconButton(
-      tooltip: 'Compartir por correo',
-      onPressed: _sending ? null : _openDialog,
-      icon: child,
-    )
+            tooltip: 'Compartir por correo',
+            onPressed: _sending ? null : _openDialog,
+            icon: child,
+          )
         : TextButton(
-      onPressed: _sending ? null : _openDialog,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: const StadiumBorder(),
-        backgroundColor: t.surfaceAlt,
-        foregroundColor: t.text,
-      ),
-      child: child,
-    );
+            onPressed: _sending ? null : _openDialog,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: const StadiumBorder(),
+              backgroundColor: t.surfaceAlt,
+              foregroundColor: t.text,
+            ),
+            child: child,
+          );
   }
 }

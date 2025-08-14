@@ -11,10 +11,10 @@ class Note {
   });
 
   Map<String, dynamic> toJson() => {
-    'title': title,
-    'content': content,
-    'imagePath': imagePath,
-  };
+        'title': title,
+        'content': content,
+        'imagePath': imagePath,
+      };
 
   factory Note.fromJson(Map<String, dynamic> json) {
     final t = json['title'];
@@ -26,8 +26,7 @@ class Note {
           'El JSON de Note debe incluir "title" y "content".');
     }
     if (t is! String || c is! String) {
-      throw const FormatException(
-          '"title" y "content" deben ser String.');
+      throw const FormatException('"title" y "content" deben ser String.');
     }
 
     // Normaliza y evita vacíos

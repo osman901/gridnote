@@ -48,10 +48,10 @@ Future<List<FileInfo>> scanReports() async {
       final origin = path.startsWith(reportsDir.path)
           ? 'Historial'
           : path.startsWith(docs.path)
-          ? 'Documents'
-          : path.startsWith(temp.path)
-          ? 'Temp'
-          : '—';
+              ? 'Documents'
+              : path.startsWith(temp.path)
+                  ? 'Temp'
+                  : '—';
 
       out.add(FileInfo(
         file: e,

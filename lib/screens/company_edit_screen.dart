@@ -66,7 +66,8 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo seleccionar la imagen. Verificá los permisos.'),
+          content:
+              Text('No se pudo seleccionar la imagen. Verificá los permisos.'),
         ),
       );
     }
@@ -103,7 +104,8 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: No se pudo guardar la información.')),
+          const SnackBar(
+              content: Text('Error: No se pudo guardar la información.')),
         );
       }
     } finally {
@@ -138,23 +140,26 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
                   onTap: _pickLogo,
                   child: CircleAvatar(
                     radius: 48,
-                    backgroundImage: _logoFile != null ? FileImage(_logoFile!) : null,
-                    child: _logoFile == null ? const Icon(Icons.add_a_photo, size: 32) : null,
+                    backgroundImage:
+                        _logoFile != null ? FileImage(_logoFile!) : null,
+                    child: _logoFile == null
+                        ? const Icon(Icons.add_a_photo, size: 32)
+                        : null,
                   ),
                 ),
               ),
               const SizedBox(height: 18),
-
               TextFormField(
                 controller: _nombreCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Nombre',
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingrese un nombre' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Ingrese un nombre'
+                    : null,
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _direccionCtrl,
                 decoration: const InputDecoration(
@@ -164,7 +169,6 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
                 maxLines: 2,
               ),
               const SizedBox(height: 12),
-
               TextFormField(
                 controller: _emailCtrl,
                 decoration: const InputDecoration(
@@ -175,7 +179,6 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
                 validator: _emailValidator,
               ),
               const SizedBox(height: 18),
-
               Row(
                 children: [
                   const Text('Color institucional:'),
@@ -187,15 +190,14 @@ class _CompanyEditScreenState extends State<CompanyEditScreen> {
                 ],
               ),
               const SizedBox(height: 28),
-
               ElevatedButton.icon(
                 onPressed: saving ? null : _save,
                 icon: saving
                     ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.save),
                 label: Text(saving ? 'Guardando...' : 'Guardar'),
                 style: ElevatedButton.styleFrom(

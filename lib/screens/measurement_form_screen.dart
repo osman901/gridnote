@@ -43,8 +43,8 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     final m = widget.initial ?? Measurement.empty();
 
     _progCtrl = TextEditingController(text: m.progresiva);
-    _ohm1Ctrl = TextEditingController(text: m.ohm1m?.toString() ?? '');
-    _ohm3Ctrl = TextEditingController(text: m.ohm3m?.toString() ?? '');
+    _ohm1Ctrl = TextEditingController(text: m.ohm1m.toString() ?? '');
+    _ohm3Ctrl = TextEditingController(text: m.ohm3m.toString() ?? '');
     _obsCtrl = TextEditingController(text: m.observations);
     _latCtrl = TextEditingController(text: m.latitude?.toString() ?? '');
     _lonCtrl = TextEditingController(text: m.longitude?.toString() ?? '');
@@ -109,7 +109,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
   Widget build(BuildContext context) {
     final editing = widget.initial != null;
 
-    String? _numValidator(String? v, {bool allowEmpty = true}) {
+    String? numValidator(String? v, {bool allowEmpty = true}) {
       final s = (v ?? '').trim();
       if (s.isEmpty) return allowEmpty ? null : 'Requerido';
       try {
@@ -135,25 +135,25 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                 controller: _progCtrl,
                 decoration: const InputDecoration(labelText: 'Progresiva'),
                 validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    (v == null || v.trim().isEmpty) ? 'Requerido' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _ohm1Ctrl,
                 keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+                    const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [_posDecimalFormatter],
                 decoration: const InputDecoration(labelText: 'Ohm 1m'),
-                validator: (v) => _numValidator(v, allowEmpty: true),
+                validator: (v) => numValidator(v, allowEmpty: true),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _ohm3Ctrl,
                 keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+                    const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [_posDecimalFormatter],
                 decoration: const InputDecoration(labelText: 'Ohm 3m'),
-                validator: (v) => _numValidator(v, allowEmpty: true),
+                validator: (v) => numValidator(v, allowEmpty: true),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -171,7 +171,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                           decimal: true, signed: true),
                       inputFormatters: [_coordFormatter],
                       decoration: const InputDecoration(labelText: 'Latitud'),
-                      validator: (v) => _numValidator(v, allowEmpty: true),
+                      validator: (v) => numValidator(v, allowEmpty: true),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -182,7 +182,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                           decimal: true, signed: true),
                       inputFormatters: [_coordFormatter],
                       decoration: const InputDecoration(labelText: 'Longitud'),
-                      validator: (v) => _numValidator(v, allowEmpty: true),
+                      validator: (v) => numValidator(v, allowEmpty: true),
                     ),
                   ),
                 ],

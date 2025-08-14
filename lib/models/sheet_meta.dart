@@ -3,7 +3,7 @@ import 'dart:convert';
 class SheetMeta {
   final String id;
   String name;
-  DateTime createdAt;     // Siempre en UTC
+  DateTime createdAt; // Siempre en UTC
   double? latitude;
   double? longitude;
 
@@ -31,12 +31,13 @@ class SheetMeta {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toUtc().toIso8601String(), // ISO-8601 UTC (con 'Z')
-    'latitude': latitude,
-    'longitude': longitude,
-  };
+        'id': id,
+        'name': name,
+        'createdAt':
+            createdAt.toUtc().toIso8601String(), // ISO-8601 UTC (con 'Z')
+        'latitude': latitude,
+        'longitude': longitude,
+      };
 
   static SheetMeta fromJson(Map<String, dynamic> j) {
     // Validaciones estrictas (id, name, createdAt son obligatorios)
@@ -72,7 +73,8 @@ class SheetMeta {
   static List<SheetMeta> decodeList(String s) {
     final raw = jsonDecode(s);
     if (raw is! List) {
-      throw const FormatException('Se esperaba un JSON array para SheetMeta[].');
+      throw const FormatException(
+          'Se esperaba un JSON array para SheetMeta[].');
     }
     return raw.map<SheetMeta>((e) {
       if (e is! Map<String, dynamic>) {

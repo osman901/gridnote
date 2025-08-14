@@ -23,22 +23,22 @@ class SheetMeta {
   double? longitude;
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toIso8601String(),
-    'updatedAt': updatedAt.toIso8601String(),
-    'lat': latitude,
-    'lon': longitude,
-  };
+        'id': id,
+        'name': name,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'lat': latitude,
+        'lon': longitude,
+      };
 
   static SheetMeta fromJson(Map<String, dynamic> j) => SheetMeta(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    createdAt: DateTime.parse(j['createdAt'] as String),
-    updatedAt: DateTime.parse(j['updatedAt'] as String),
-    latitude: (j['lat'] as num?)?.toDouble(),
-    longitude: (j['lon'] as num?)?.toDouble(),
-  );
+        id: j['id'] as String,
+        name: j['name'] as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        updatedAt: DateTime.parse(j['updatedAt'] as String),
+        latitude: (j['lat'] as num?)?.toDouble(),
+        longitude: (j['lon'] as num?)?.toDouble(),
+      );
 }
 
 /// Persistencia simple con SharedPreferences.
@@ -64,10 +64,12 @@ class SheetsStore {
     await sp.setStringList(_key, payload);
   }
 
-  static Future<SheetMeta> create({String? name, double? lat, double? lon}) async {
+  static Future<SheetMeta> create(
+      {String? name, double? lat, double? lon}) async {
     final now = DateTime.now();
-    final suggested =
-    (name?.trim().isNotEmpty ?? false) ? name!.trim() : _suggestDefaultName(now);
+    final suggested = (name?.trim().isNotEmpty ?? false)
+        ? name!.trim()
+        : _suggestDefaultName(now);
     final m = SheetMeta(
       id: now.microsecondsSinceEpoch.toString(),
       name: suggested,
@@ -78,7 +80,8 @@ class SheetsStore {
     );
 
     // Operación atómica: leer -> modificar -> escribir.
-    final all = await list()..add(m);
+    final all = await list()
+      ..add(m);
     await _saveAll(all);
     return m;
   }
@@ -155,8 +158,12 @@ class _SpreadsheetMenuState extends State<SpreadsheetMenu> {
         title: const Text('Renombrar planilla'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Guardar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Guardar')),
         ],
       ),
     );
@@ -179,8 +186,12 @@ class _SpreadsheetMenuState extends State<SpreadsheetMenu> {
         title: const Text('Eliminar planilla'),
         content: Text('¿Seguro que querés borrar "${m.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Eliminar')),
         ],
       ),
     );
@@ -203,28 +214,32 @@ class _SpreadsheetMenuState extends State<SpreadsheetMenu> {
       body: _items.isEmpty
           ? const Center(child: Text('No hay planillas aún'))
           : ListView.separated(
-        itemCount: _items.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (_, i) {
-          final m = _items[i];
-          return ListTile(
-            title: Text(m.name),
-            subtitle: Text(
-              'Creada: ${_dateFmt.format(m.createdAt)} · Última: ${_dateTimeFmt.format(m.updatedAt)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final m = _items[i];
+                return ListTile(
+                  title: Text(m.name),
+                  subtitle: Text(
+                    'Creada: ${_dateFmt.format(m.createdAt)} · Última: ${_dateTimeFmt.format(m.updatedAt)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _rename(m)),
+                      IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () => _delete(m)),
+                    ],
+                  ),
+                  onTap: () => widget.onOpen(m),
+                );
+              },
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(icon: const Icon(Icons.edit), onPressed: () => _rename(m)),
-                IconButton(icon: const Icon(Icons.delete), onPressed: () => _delete(m)),
-              ],
-            ),
-            onTap: () => widget.onOpen(m),
-          );
-        },
-      ),
     );
   }
 }

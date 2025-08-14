@@ -15,7 +15,8 @@ class MeasurementColumn {
   static const String progresiva = 'progresiva';
   static const String ohm1m = 'ohm1m';
   static const String ohm3m = 'ohm3m';
-  static const String observations = 'observations'; // fallback a 'obs' si la DS usa ese nombre
+  static const String observations =
+      'observations'; // fallback a 'obs' si la DS usa ese nombre
   static const String date = 'date';
   static const String maps = 'maps';
   static const String edit = '_edit';
@@ -48,7 +49,8 @@ class MeasurementGridController {
   bool Function()? _canUndoGetter;
   bool Function()? _canRedoGetter;
 
-  List<Measurement> snapshot() => _snapshotGetter?.call() ?? const <Measurement>[];
+  List<Measurement> snapshot() =>
+      _snapshotGetter?.call() ?? const <Measurement>[];
   void undo() => _undoFn?.call();
   void redo() => _redoFn?.call();
   bool get canUndo => _canUndoGetter?.call() ?? false;
@@ -152,7 +154,8 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
     super.dispose();
   }
 
-  Widget _header(String text, Color bg, GridnoteTableStyle table, {FontWeight fw = FontWeight.w700}) {
+  Widget _header(String text, Color bg, GridnoteTableStyle table,
+      {FontWeight fw = FontWeight.w700}) {
     return Container(
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
@@ -185,7 +188,8 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
       altRowColor: table.cellBgAlt,
       cellTextStyle: TextStyle(color: table.cellText),
       cellPadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-      indexTextStyle: TextStyle(color: table.cellText, fontWeight: FontWeight.w600),
+      indexTextStyle:
+          TextStyle(color: table.cellText, fontWeight: FontWeight.w600),
       indexWidth: 44.0,
     );
   }
@@ -194,14 +198,14 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < kCompactLayoutBreakpoint;
     final double rowH = compact ? kCompactRowHeight : kRegularRowHeight;
-    final double headerH = compact ? kCompactHeaderHeight : kRegularHeaderHeight;
+    final double headerH =
+        compact ? kCompactHeaderHeight : kRegularHeaderHeight;
 
     // En SfDataPager, pageCount es double en varias versiones.
     final double pageCount = (_source.itemCount == 0)
         ? 1.0
-        : (((_source.itemCount + widget.rowsPerPage - 1) ~/
-        widget.rowsPerPage)
-        .toDouble());
+        : (((_source.itemCount + widget.rowsPerPage - 1) ~/ widget.rowsPerPage)
+            .toDouble());
 
     return AnimatedBuilder(
       animation: widget.themeController,
@@ -232,16 +236,13 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
                     controller: _dg,
                     frozenColumnsCount: 1,
                     footerFrozenRowsCount: 0,
-
                     allowEditing: true,
                     editingGestureType: EditingGestureType.tap,
-
                     allowSorting: true,
                     allowFiltering: true,
                     sortingGestureType: SortingGestureType.tap,
                     headerGridLinesVisibility: GridLinesVisibility.both,
                     gridLinesVisibility: GridLinesVisibility.both,
-
                     columnWidthMode: widthMode,
                     rowHeight: rowH,
                     headerRowHeight: headerH,
@@ -249,15 +250,17 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
                     navigationMode: GridNavigationMode.cell,
                     allowPullToRefresh: widget.pullToRefresh,
                     onSelectionChanged: widget.onSelectionChanged,
-
                     onCellTap: (DataGridCellTapDetails details) async {
                       final rci = details.rowColumnIndex;
                       if (rci.rowIndex <= 0) return; // header
                       // En versiones recientes, column es no-nullable
-                      if (details.column.columnName != MeasurementColumn.edit) return;
+                      if (details.column.columnName != MeasurementColumn.edit) {
+                        return;
+                      }
                       final int dataRowIndex = rci.rowIndex - 1;
                       if (dataRowIndex >= _source.effectiveRows.length) return;
-                      final DataGridRow row = _source.effectiveRows[dataRowIndex];
+                      final DataGridRow row =
+                          _source.effectiveRows[dataRowIndex];
                       final m = _rowToMeasurement(row);
                       await MeasurementRowEditor.show(
                         context,
@@ -267,18 +270,19 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
                         onDuplicate: widget.onDuplicateRow,
                       );
                     },
-
                     columns: [
                       GridColumn(
                         width: 44.0,
                         columnName: MeasurementColumn.index,
-                        label: _header('A', table.indexHeaderBg, table, fw: FontWeight.w600),
+                        label: _header('A', table.indexHeaderBg, table,
+                            fw: FontWeight.w600),
                         allowFiltering: false,
                         allowSorting: false,
                       ),
                       GridColumn(
                         columnName: MeasurementColumn.progresiva,
-                        label: _header('Progresiva', table.progressiveHeaderBg, table),
+                        label: _header(
+                            'Progresiva', table.progressiveHeaderBg, table),
                         allowEditing: true,
                       ),
                       GridColumn(
@@ -313,23 +317,37 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
                         width: 56.0,
                         columnName: MeasurementColumn.edit,
                         label: Center(
-                          child: Text('✎', style: TextStyle(color: table.headerText, fontWeight: FontWeight.w700)),
+                          child: Text('✎',
+                              style: TextStyle(
+                                  color: table.headerText,
+                                  fontWeight: FontWeight.w700)),
                         ),
                         allowFiltering: false,
                         allowSorting: false,
                         allowEditing: false,
                       ),
                     ],
-
                     tableSummaryRows: <GridTableSummaryRow>[
                       GridTableSummaryRow(
                         position: GridTableSummaryRowPosition.bottom,
                         showSummaryInRow: false,
                         columns: const <GridSummaryColumn>[
-                          GridSummaryColumn(name: 'sum1', columnName: MeasurementColumn.ohm1m, summaryType: GridSummaryType.sum),
-                          GridSummaryColumn(name: 'avg1', columnName: MeasurementColumn.ohm1m, summaryType: GridSummaryType.average),
-                          GridSummaryColumn(name: 'sum3', columnName: MeasurementColumn.ohm3m, summaryType: GridSummaryType.sum),
-                          GridSummaryColumn(name: 'avg3', columnName: MeasurementColumn.ohm3m, summaryType: GridSummaryType.average),
+                          GridSummaryColumn(
+                              name: 'sum1',
+                              columnName: MeasurementColumn.ohm1m,
+                              summaryType: GridSummaryType.sum),
+                          GridSummaryColumn(
+                              name: 'avg1',
+                              columnName: MeasurementColumn.ohm1m,
+                              summaryType: GridSummaryType.average),
+                          GridSummaryColumn(
+                              name: 'sum3',
+                              columnName: MeasurementColumn.ohm3m,
+                              summaryType: GridSummaryType.sum),
+                          GridSummaryColumn(
+                              name: 'avg3',
+                              columnName: MeasurementColumn.ohm3m,
+                              summaryType: GridSummaryType.average),
                         ],
                       ),
                     ],
@@ -337,7 +355,6 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
                 ),
               ),
             ),
-
             if (widget.enablePager)
               SfDataPager(
                 delegate: _source,
@@ -363,13 +380,19 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
     // Soporta nombres alternativos (obs/observations) y columnas no visibles (lat/lon/id)
     final id = _cell<int?>(row, MeasurementColumn.id);
     final progresiva = _cell<String>(row, MeasurementColumn.progresiva) ?? '';
-    final double ohm1 = (_cell<num?>(row, MeasurementColumn.ohm1m)?.toDouble()) ?? 0.0;
-    final double ohm3 = (_cell<num?>(row, MeasurementColumn.ohm3m)?.toDouble()) ?? 0.0;
+    final double ohm1 =
+        (_cell<num?>(row, MeasurementColumn.ohm1m)?.toDouble()) ?? 0.0;
+    final double ohm3 =
+        (_cell<num?>(row, MeasurementColumn.ohm3m)?.toDouble()) ?? 0.0;
     final obs = _cell<String>(row, MeasurementColumn.observations) ??
-        _cell<String>(row, 'obs') ?? '';
-    final date = _cell<DateTime?>(row, MeasurementColumn.date) ?? DateTime.now();
-    final double lat = (_cell<num?>(row, MeasurementColumn.lat)?.toDouble()) ?? 0.0;
-    final double lon = (_cell<num?>(row, MeasurementColumn.lon)?.toDouble()) ?? 0.0;
+        _cell<String>(row, 'obs') ??
+        '';
+    final date =
+        _cell<DateTime?>(row, MeasurementColumn.date) ?? DateTime.now();
+    final double lat =
+        (_cell<num?>(row, MeasurementColumn.lat)?.toDouble()) ?? 0.0;
+    final double lon =
+        (_cell<num?>(row, MeasurementColumn.lon)?.toDouble()) ?? 0.0;
 
     return Measurement(
       id: id,

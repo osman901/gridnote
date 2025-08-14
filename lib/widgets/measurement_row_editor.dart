@@ -20,12 +20,12 @@ class MeasurementRowEditor extends StatefulWidget {
   final ValueChanged<Measurement>? onDuplicate;
 
   static Future<void> show(
-      BuildContext context, {
-        required Measurement initial,
-        required ValueChanged<Measurement> onSave,
-        ValueChanged<Measurement>? onDelete,
-        ValueChanged<Measurement>? onDuplicate,
-      }) {
+    BuildContext context, {
+    required Measurement initial,
+    required ValueChanged<Measurement> onSave,
+    ValueChanged<Measurement>? onDelete,
+    ValueChanged<Measurement>? onDuplicate,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -55,9 +55,9 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
   final _progCtrl = TextEditingController();
   final _ohm1Ctrl = TextEditingController();
   final _ohm3Ctrl = TextEditingController();
-  final _obsCtrl  = TextEditingController();
-  final _latCtrl  = TextEditingController();
-  final _lonCtrl  = TextEditingController();
+  final _obsCtrl = TextEditingController();
+  final _latCtrl = TextEditingController();
+  final _lonCtrl = TextEditingController();
   DateTime _date = DateTime.now();
 
   @override
@@ -65,17 +65,19 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
     super.initState();
     m = widget.initial; // sin copy(); evitamos error si no existe
     _progCtrl.text = m.progresiva;
-    _ohm1Ctrl.text = m.ohm1m?.toString() ?? '';
-    _ohm3Ctrl.text = m.ohm3m?.toString() ?? '';
-    _obsCtrl.text  = m.observations;
-    _latCtrl.text  = m.latitude?.toStringAsFixed(6) ?? '';
-    _lonCtrl.text  = m.longitude?.toStringAsFixed(6) ?? '';
+    _ohm1Ctrl.text = m.ohm1m.toString() ?? '';
+    _ohm3Ctrl.text = m.ohm3m.toString() ?? '';
+    _obsCtrl.text = m.observations;
+    _latCtrl.text = m.latitude?.toStringAsFixed(6) ?? '';
+    _lonCtrl.text = m.longitude?.toStringAsFixed(6) ?? '';
     _date = m.date;
   }
 
   @override
   void dispose() {
-    for (final n in _nodes) { n.dispose(); }
+    for (final n in _nodes) {
+      n.dispose();
+    }
     _progCtrl.dispose();
     _ohm1Ctrl.dispose();
     _ohm3Ctrl.dispose();
@@ -86,8 +88,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
   }
 
   // Utilidades
-  TextInputFormatter get _numFmt =>
-      FilteringTextInputFormatter.allow(RegExp(r'[0-9\-.,]')); // sin escape redundante
+  TextInputFormatter get _numFmt => FilteringTextInputFormatter.allow(
+      RegExp(r'[0-9\-.,]')); // sin escape redundante
 
   double? _toDouble(String s) {
     final t = s.replaceAll(',', '.').trim();
@@ -131,7 +133,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (perm == LocationPermission.denied ||
+            perm == LocationPermission.deniedForever) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Permiso de ubicación denegado.')),
@@ -190,32 +193,35 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.grid_on, size: 18, color: Theme.of(context).colorScheme.primary),
+                  Icon(Icons.grid_on,
+                      size: 18, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  const Text('Editar fila', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('Editar fila',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
                   const Spacer(),
                   IconButton(
                     tooltip: 'Duplicar',
                     onPressed: widget.onDuplicate == null
                         ? null
                         : () {
-                      widget.onDuplicate!(m.copyWith(id: null));
-                      Navigator.of(context).maybePop();
-                    },
+                            widget.onDuplicate!(m.copyWith(id: null));
+                            Navigator.of(context).maybePop();
+                          },
                     icon: const Icon(Icons.copy_all),
                   ),
                   IconButton(
                     tooltip: 'Borrar',
-                    onPressed: widget.onDelete == null ? null : () {
-                      widget.onDelete!(m);
-                      Navigator.of(context).maybePop();
-                    },
+                    onPressed: widget.onDelete == null
+                        ? null
+                        : () {
+                            widget.onDelete!(m);
+                            Navigator.of(context).maybePop();
+                          },
                     icon: const Icon(Icons.delete_outline),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-
               TextFormField(
                 focusNode: _nodes[0],
                 controller: _progCtrl,
@@ -223,14 +229,14 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                 decoration: const InputDecoration(labelText: 'Progresiva'),
                 validator: (v) => null,
               ),
-
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       focusNode: _nodes[1],
                       controller: _ohm1Ctrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(labelText: '1 m Ω'),
@@ -246,7 +252,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                     child: TextFormField(
                       focusNode: _nodes[2],
                       controller: _ohm3Ctrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(labelText: '3 m Ω'),
@@ -259,7 +266,6 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                   ),
                 ],
               ),
-
               TextFormField(
                 focusNode: _nodes[3],
                 controller: _obsCtrl,
@@ -268,14 +274,14 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                 decoration: const InputDecoration(labelText: 'Observaciones'),
                 validator: (v) => null,
               ),
-
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       focusNode: _nodes[4],
                       controller: _latCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true, signed: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(labelText: 'Latitud'),
@@ -284,7 +290,9 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                         if (t.isEmpty) return null;
                         final val = _toDouble(t);
                         if (val == null) return 'Valor inválido';
-                        if (val < -90 || val > 90) return 'Debe estar entre -90 y 90';
+                        if (val < -90 || val > 90) {
+                          return 'Debe estar entre -90 y 90';
+                        }
                         return null;
                       },
                     ),
@@ -294,7 +302,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                     child: TextFormField(
                       focusNode: _nodes[5],
                       controller: _lonCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true, signed: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.done,
                       onEditingComplete: _save, // guarda al tocar “Listo”
@@ -304,7 +313,9 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                         if (t.isEmpty) return null;
                         final val = _toDouble(t);
                         if (val == null) return 'Valor inválido';
-                        if (val < -180 || val > 180) return 'Debe estar entre -180 y 180';
+                        if (val < -180 || val > 180) {
+                          return 'Debe estar entre -180 y 180';
+                        }
                         return null;
                       },
                     ),
@@ -316,7 +327,6 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                   ),
                 ],
               ),
-
               Row(
                 children: [
                   Expanded(
@@ -326,8 +336,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                         decoration: const InputDecoration(labelText: 'Fecha'),
                         child: Text(
                           '${_date.day.toString().padLeft(2, '0')}/'
-                              '${_date.month.toString().padLeft(2, '0')}/'
-                              '${_date.year}',
+                          '${_date.month.toString().padLeft(2, '0')}/'
+                          '${_date.year}',
                         ),
                       ),
                     ),
@@ -340,7 +350,6 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: _save,
@@ -353,11 +362,11 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
           ),
         ),
       ),
-
       bottomNavigationBar: AnimatedPadding(
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: _KeyboardBar(
           onPrev: _focusPrev,
           onNext: _focusNext,

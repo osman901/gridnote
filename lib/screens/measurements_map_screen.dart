@@ -29,26 +29,26 @@ class _MeasurementsMapScreenState extends State<MeasurementsMapScreen> {
     _markers = _points
         .map(
           (m) => Marker(
-        point: LatLng(m.latitude!, m.longitude!),
-        width: 40,
-        height: 40,
-        child: Tooltip(
-          message: '${m.progresiva}\n${m.observations}',
-          child: const Icon(Icons.location_on, size: 36, color: Colors.red),
-        ),
-      ),
-    )
+            point: LatLng(m.latitude!, m.longitude!),
+            width: 40,
+            height: 40,
+            child: Tooltip(
+              message: '${m.progresiva}\n${m.observations}',
+              child: const Icon(Icons.location_on, size: 36, color: Colors.red),
+            ),
+          ),
+        )
         .toList();
 
     _bounds = _points.isEmpty
         ? LatLngBounds.fromPoints([
-      // Fallback (Neuquén) — no se usará si no hay puntos, ver build()
-      const LatLng(-38.9516, -68.0591),
-      const LatLng(-38.9516, -68.0591),
-    ])
+            // Fallback (Neuquén) — no se usará si no hay puntos, ver build()
+            const LatLng(-38.9516, -68.0591),
+            const LatLng(-38.9516, -68.0591),
+          ])
         : LatLngBounds.fromPoints(
-      _points.map((m) => LatLng(m.latitude!, m.longitude!)).toList(),
-    );
+            _points.map((m) => LatLng(m.latitude!, m.longitude!)).toList(),
+          );
   }
 
   @override

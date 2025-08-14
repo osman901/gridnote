@@ -12,7 +12,8 @@ class WelcomeScreen extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor:
+          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
@@ -22,7 +23,7 @@ class WelcomeScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.grid_on, size: 72, color: AppColors.primary),
+                  const Icon(Icons.grid_on, size: 72, color: AppColors.primary),
                   const SizedBox(height: 28),
                   Text(
                     '¡Bienvenido a Grid Note!',
@@ -35,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'La herramienta profesional para tus mediciones.\n'
-                        'Usá Grid Note sin límites por 1 mes gratis.',
+                    'Usá Grid Note sin límites por 1 mes gratis.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge,
                   ),

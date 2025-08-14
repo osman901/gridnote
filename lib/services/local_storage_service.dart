@@ -6,7 +6,8 @@ class LocalStorageService {
   static const String _boxName = 'gridnote_data';
 
   // Guarda la lista de planillas
-  static Future<void> savePlanillas(List<Map<String, dynamic>> planillas) async {
+  static Future<void> savePlanillas(
+      List<Map<String, dynamic>> planillas) async {
     final box = await Hive.openBox(_boxName);
     await box.put('planillas', planillas);
     await box.close();
@@ -17,6 +18,8 @@ class LocalStorageService {
     final box = await Hive.openBox(_boxName);
     final data = box.get('planillas', defaultValue: []) as List?;
     await box.close();
-    return (data?.cast<Map>() ?? []).map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+    return (data?.cast<Map>() ?? [])
+        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 }

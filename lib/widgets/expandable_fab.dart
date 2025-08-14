@@ -12,7 +12,7 @@ class ExpandableFab extends StatefulWidget {
   const ExpandableFab({
     super.key,
     required this.actions,
-    this.distance = 68,      // separación vertical entre botones
+    this.distance = 68, // separación vertical entre botones
     this.mainTooltip = 'Acciones',
   });
 

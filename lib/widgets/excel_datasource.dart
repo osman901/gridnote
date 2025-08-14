@@ -57,20 +57,20 @@ class ExcelDataSource extends DataGridSource {
 
   @override
   Future<bool> canSubmitCell(
-      DataGridRow dataGridRow,
-      RowColumnIndex rowColumnIndex,
-      GridColumn column,
-      ) async {
+    DataGridRow dataGridRow,
+    RowColumnIndex rowColumnIndex,
+    GridColumn column,
+  ) async {
     // Devolver false si querés bloquear el commit.
     return true;
   }
 
   @override
   Future<void> onCellSubmit(
-      DataGridRow dataGridRow,
-      RowColumnIndex rowColumnIndex,
-      GridColumn column,
-      ) async {
+    DataGridRow dataGridRow,
+    RowColumnIndex rowColumnIndex,
+    GridColumn column,
+  ) async {
     final r = _rows.indexOf(dataGridRow);
     final c = rowColumnIndex.columnIndex;
     final newValue = dataGridRow.getCells()[c].value?.toString() ?? '';

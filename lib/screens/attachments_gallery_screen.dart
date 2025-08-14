@@ -8,7 +8,8 @@ class AttachmentsGalleryScreen extends StatefulWidget {
   const AttachmentsGalleryScreen({super.key, required this.measurementKey});
 
   @override
-  State<AttachmentsGalleryScreen> createState() => _AttachmentsGalleryScreenState();
+  State<AttachmentsGalleryScreen> createState() =>
+      _AttachmentsGalleryScreenState();
 }
 
 class _AttachmentsGalleryScreenState extends State<AttachmentsGalleryScreen> {
@@ -31,7 +32,9 @@ class _AttachmentsGalleryScreenState extends State<AttachmentsGalleryScreen> {
         await for (final entity in dir.list()) {
           if (entity is! File) continue;
           final path = entity.path.toLowerCase();
-          if (path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png')) {
+          if (path.endsWith('.jpg') ||
+              path.endsWith('.jpeg') ||
+              path.endsWith('.png')) {
             files.add(entity);
           }
         }
@@ -58,46 +61,49 @@ class _AttachmentsGalleryScreenState extends State<AttachmentsGalleryScreen> {
       (true, _) => const Center(child: CircularProgressIndicator()),
       (false, true) => const Center(child: Text('Sin adjuntos')),
       _ => RefreshIndicator(
-        onRefresh: () => _load(silently: true),
-        child: GridView.builder(
-          padding: const EdgeInsets.all(8),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: _files.length,
-          itemBuilder: (_, i) {
-            final f = _files[i];
-            return GestureDetector(
-              onTap: () async {
-                final changed = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(builder: (_) => _FullImageScreen(file: f)),
-                );
-                if (changed == true && mounted) {
-                  _load(silently: true); // refresca si hubo cambios (p. ej., borrado)
-                }
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Hero(
-                  tag: f.path,
-                  child: Image.file(
-                    f,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.low,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: Colors.grey.shade300,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.broken_image_outlined),
+          onRefresh: () => _load(silently: true),
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _files.length,
+            itemBuilder: (_, i) {
+              final f = _files[i];
+              return GestureDetector(
+                onTap: () async {
+                  final changed = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                        builder: (_) => _FullImageScreen(file: f)),
+                  );
+                  if (changed == true && mounted) {
+                    _load(
+                        silently:
+                            true); // refresca si hubo cambios (p. ej., borrado)
+                  }
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Hero(
+                    tag: f.path,
+                    child: Image.file(
+                      f,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.low,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade300,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
     };
 
     return Scaffold(
@@ -113,16 +119,21 @@ class _FullImageScreen extends StatelessWidget {
 
   Future<void> _delete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Eliminar archivo'),
-        content: const Text('¿Querés borrar este adjunto? Esta acción no se puede deshacer.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Borrar')),
-        ],
-      ),
-    ) ??
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Eliminar archivo'),
+            content: const Text(
+                '¿Querés borrar este adjunto? Esta acción no se puede deshacer.'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Borrar')),
+            ],
+          ),
+        ) ??
         false;
 
     if (!confirmed) return;
@@ -163,7 +174,10 @@ class _FullImageScreen extends StatelessWidget {
           child: InteractiveViewer(
             child: Image.file(
               file,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white, size: 48),
+              errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white,
+                  size: 48),
             ),
           ),
         ),

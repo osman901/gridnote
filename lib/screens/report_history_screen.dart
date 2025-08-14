@@ -34,12 +34,16 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
     Iterable<FileInfo> f = src;
 
     if (_type != _ReportType.all) {
-      f = f.where((x) => _type == _ReportType.pdf ? x.ext == '.pdf' : x.ext == '.xlsx');
+      f = f.where(
+          (x) => _type == _ReportType.pdf ? x.ext == '.pdf' : x.ext == '.xlsx');
     }
     if (_range != null) {
-      final start = DateTime(_range!.start.year, _range!.start.month, _range!.start.day);
-      final end = DateTime(_range!.end.year, _range!.end.month, _range!.end.day, 23, 59, 59);
-      f = f.where((x) => !x.modified.isBefore(start) && !x.modified.isAfter(end));
+      final start =
+          DateTime(_range!.start.year, _range!.start.month, _range!.start.day);
+      final end = DateTime(
+          _range!.end.year, _range!.end.month, _range!.end.day, 23, 59, 59);
+      f = f.where(
+          (x) => !x.modified.isBefore(start) && !x.modified.isAfter(end));
     }
     return f.toList();
   }
@@ -52,7 +56,8 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
       lastDate: DateTime(now.year + 1),
       initialDateRange: _range ??
           DateTimeRange(
-            start: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7)),
+            start: DateTime(now.year, now.month, now.day)
+                .subtract(const Duration(days: 7)),
             end: DateTime(now.year, now.month, now.day),
           ),
       helpText: 'Filtrar por fechas',
@@ -120,17 +125,20 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                     ChoiceChip(
                       label: const Text('Todos'),
                       selected: _type == _ReportType.all,
-                      onSelected: (_) => setState(() => _type = _ReportType.all),
+                      onSelected: (_) =>
+                          setState(() => _type = _ReportType.all),
                     ),
                     ChoiceChip(
                       label: const Text('PDF'),
                       selected: _type == _ReportType.pdf,
-                      onSelected: (_) => setState(() => _type = _ReportType.pdf),
+                      onSelected: (_) =>
+                          setState(() => _type = _ReportType.pdf),
                     ),
                     ChoiceChip(
                       label: const Text('Excel'),
                       selected: _type == _ReportType.xlsx,
-                      onSelected: (_) => setState(() => _type = _ReportType.xlsx),
+                      onSelected: (_) =>
+                          setState(() => _type = _ReportType.xlsx),
                     ),
                     if (_range != null)
                       InputChip(
@@ -152,8 +160,10 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                     final it = items[i];
                     final isPdf = it.ext == '.pdf';
                     return ListTile(
-                      leading: Icon(isPdf ? Icons.picture_as_pdf : Icons.grid_on),
-                      title: Text(p.basename(it.file.path), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      leading:
+                          Icon(isPdf ? Icons.picture_as_pdf : Icons.grid_on),
+                      title: Text(p.basename(it.file.path),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
                         '${_dateFmt.format(it.modified)} • ${formatSize(it.sizeBytes)} • ${it.origin}',
                       ),
@@ -169,22 +179,24 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                               break;
                             case 'delete':
                               final ok = await showDialog<bool>(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text('Eliminar archivo'),
-                                  content: Text('¿Eliminar “${it.name}”?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('Cancelar'),
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Eliminar archivo'),
+                                      content: Text('¿Eliminar “${it.name}”?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Eliminar'),
+                                        ),
+                                      ],
                                     ),
-                                    FilledButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      child: const Text('Eliminar'),
-                                    ),
-                                  ],
-                                ),
-                              ) ??
+                                  ) ??
                                   false;
                               if (!ok) return;
                               try {
@@ -193,7 +205,8 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                               } catch (_) {
                                 if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('No se pudo eliminar.')),
+                                  const SnackBar(
+                                      content: Text('No se pudo eliminar.')),
                                 );
                               }
                               break;
@@ -201,7 +214,8 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                         },
                         itemBuilder: (_) => const [
                           PopupMenuItem(value: 'open', child: Text('Abrir')),
-                          PopupMenuItem(value: 'share', child: Text('Compartir')),
+                          PopupMenuItem(
+                              value: 'share', child: Text('Compartir')),
                           PopupMenuItem(
                             value: 'delete',
                             child: Text('Eliminar'),

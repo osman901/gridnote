@@ -164,7 +164,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
         _snack('Sin permisos de ubicación.');
         return;
       }
@@ -209,7 +210,9 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   // ---------- XLSX / Share ----------
   String _safeFileName(String name) {
     final cleaned = name.trim().isEmpty ? 'planilla' : name.trim();
-    return cleaned.replaceAll(RegExp(r'[^a-zA-Z0-9_\- ]'), '_').replaceAll(' ', '_');
+    return cleaned
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_\- ]'), '_')
+        .replaceAll(' ', '_');
   }
 
   Future<List<int>> _buildXlsx(List<Measurement> data) async {
@@ -246,8 +249,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         sheet.getRangeByIndex(r, _cLng).setNumber(rowLng);
         sheet.getRangeByIndex(r, _cLat, r, _cLng).numberFormat = '0.000000';
         sheet.getRangeByIndex(r, _cMaps).setFormula(
-          'HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")',
-        );
+              'HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")',
+            );
       }
       r++;
     }
@@ -296,7 +299,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       b.writeln(_mapsUrl(lat, lng));
     }
 
-    final withCoords = rows.where((m) => (m.latitude != null && m.longitude != null)).toList();
+    final withCoords =
+        rows.where((m) => (m.latitude != null && m.longitude != null)).toList();
     if (withCoords.isNotEmpty) {
       b.writeln('');
       b.writeln('Enlaces por fila:');
@@ -350,7 +354,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       );
       try {
         if (await canLaunchUrl(mailto)) {
-          final ok = await launchUrl(mailto, mode: LaunchMode.externalApplication);
+          final ok =
+              await launchUrl(mailto, mode: LaunchMode.externalApplication);
           if (ok) return;
         }
       } catch (e2, st2) {
@@ -360,7 +365,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
         [
           XFile(
             file.path,
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            mimeType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           ),
         ],
         subject: 'Gridnote – ${widget.meta.name}',
@@ -440,46 +446,49 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   }
 
   ButtonStyle _chipStyle(Color surface) => OutlinedButton.styleFrom(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    visualDensity: VisualDensity.compact,
-    shape: const StadiumBorder(),
-    backgroundColor: surface,
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        visualDensity: VisualDensity.compact,
+        shape: const StadiumBorder(),
+        backgroundColor: surface,
+      );
 
   Widget _buildHeader(GridnoteTheme t, GridnoteTableStyle table) {
     final hasLoc = _lat != null && _lng != null;
 
     final locBtn = OutlinedButton.icon(
       style: _chipStyle(t.surface),
-      onPressed:
-      hasLoc ? () => _openMapsFor(lat: _lat, lng: _lng) : () => _withBusy(_saveLocation),
+      onPressed: hasLoc
+          ? () => _openMapsFor(lat: _lat, lng: _lng)
+          : () => _withBusy(_saveLocation),
       icon: Icon(hasLoc ? Icons.check_circle : Icons.place_outlined),
       label: Text(hasLoc ? 'Ubicación guardada' : 'Guardar ubicación'),
     );
 
     final titleWidget = _editingTitle
         ? TextField(
-      controller: _titleCtrl,
-      autofocus: true,
-      textInputAction: TextInputAction.done,
-      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-      decoration: const InputDecoration(isCollapsed: true, border: InputBorder.none),
-      onSubmitted: (_) => _saveTitle(),
-      onTapOutside: (_) => _saveTitle(),
-    )
+            controller: _titleCtrl,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            decoration: const InputDecoration(
+                isCollapsed: true, border: InputBorder.none),
+            onSubmitted: (_) => _saveTitle(),
+            onTapOutside: (_) => _saveTitle(),
+          )
         : GestureDetector(
-      onTap: () => setState(() => _editingTitle = true),
-      child: Text(
-        widget.meta.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        softWrap: false,
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-      ),
-    );
+            onTap: () => setState(() => _editingTitle = true),
+            child: Text(
+              widget.meta.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+          );
 
     final shareBtn = FilledButton.tonalIcon(
-      onPressed: () => _withBusy(() => _shareViaEmail(rows: _gridCtrl.snapshot())),
+      onPressed: () =>
+          _withBusy(() => _shareViaEmail(rows: _gridCtrl.snapshot())),
       icon: const Icon(Icons.ios_share_outlined),
       label: const Text('Compartir'),
     );
@@ -535,7 +544,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       int idx = next.indexWhere((e) => e.id != null && e.id == updated.id);
       if (idx < 0) {
         idx = next.indexWhere(
-              (e) => e.id == null && e.progresiva == updated.progresiva && e.date == updated.date,
+          (e) =>
+              e.id == null &&
+              e.progresiva == updated.progresiva &&
+              e.date == updated.date,
         );
       }
       if (idx >= 0) next[idx] = updated;
@@ -547,8 +559,8 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
     setState(() {
       final next = List<Measurement>.from(_rows);
       next.removeWhere(
-            (e) =>
-        (e.id != null && e.id == m.id) ||
+        (e) =>
+            (e.id != null && e.id == m.id) ||
             (e.id == null && e.progresiva == m.progresiva && e.date == m.date),
       );
       _rows = next;
@@ -578,17 +590,20 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
           resizeToAvoidBottomInset: false,
           backgroundColor: t.scaffold,
           appBar: AppBar(
-            title: Text('Planilla: ${widget.meta.id}', overflow: TextOverflow.ellipsis),
+            title: Text('Planilla: ${widget.meta.id}',
+                overflow: TextOverflow.ellipsis),
             actions: [
               PopupMenuButton<String>(
                 tooltip: 'Compartir / Exportar',
                 onSelected: (v) async {
                   switch (v) {
                     case 'send_visible':
-                      await _withBusy(() => _shareViaEmail(rows: _gridCtrl.snapshot()));
+                      await _withBusy(
+                          () => _shareViaEmail(rows: _gridCtrl.snapshot()));
                       break;
                     case 'send_all':
-                      await _withBusy(() => _shareViaEmail(rows: List<Measurement>.from(_rows)));
+                      await _withBusy(() =>
+                          _shareViaEmail(rows: List<Measurement>.from(_rows)));
                       break;
                   }
                 },

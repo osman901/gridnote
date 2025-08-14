@@ -20,7 +20,8 @@ class QuickMailService {
     final safeName = (meta.name.isEmpty ? 'planilla' : meta.name)
         .replaceAll(RegExp(r'[^\w\-\ ]+'), '_');
     final path = '${dir.path}/$safeName-${meta.id}.xlsx';
-    final file = File(path); await file.writeAsBytes(bytes, flush: true);
+    final file = File(path);
+    await file.writeAsBytes(bytes, flush: true);
 
     try {
       final email = Email(
@@ -34,7 +35,11 @@ class QuickMailService {
     } on PlatformException {
       // Fallback: hoja de compartir
       await Share.shareXFiles(
-        [XFile(path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+        [
+          XFile(path,
+              mimeType:
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        ],
         subject: 'Planilla ${meta.name}',
         text: 'Planilla ${meta.name}',
       );

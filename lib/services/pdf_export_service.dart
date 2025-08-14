@@ -37,8 +37,8 @@ class PdfExportService {
       }
     }
 
-    final pageTheme = pw.PageTheme(
-      margin: const pw.EdgeInsets.all(24),
+    const pageTheme = pw.PageTheme(
+      margin: pw.EdgeInsets.all(24),
       textDirection: pw.TextDirection.ltr,
       pageFormat: pdf.PdfPageFormat.a4,
     );
@@ -46,7 +46,8 @@ class PdfExportService {
     doc.addPage(
       pw.MultiPage(
         pageTheme: pageTheme,
-        header: (_) => _buildHeader(title: title, companyName: companyName, logo: logoImage),
+        header: (_) => _buildHeader(
+            title: title, companyName: companyName, logo: logoImage),
         footer: (ctx) => _buildFooter(ctx),
         build: (ctx) => [
           _buildQr(qrText),
@@ -88,7 +89,8 @@ class PdfExportService {
   static String _payloadFrom(List<Measurement> data) {
     final parts = <String>[];
     for (final m in data) {
-      parts.add('${m.progresiva}|${m.ohm1m}|${m.ohm3m}|${m.observations}|${m.date.toIso8601String()}');
+      parts.add(
+          '${m.progresiva}|${m.ohm1m}|${m.ohm3m}|${m.observations}|${m.date.toIso8601String()}');
     }
     return parts.join('~');
   }
@@ -155,7 +157,8 @@ class PdfExportService {
                 if (companyName != null && companyName.trim().isNotEmpty)
                   pw.Text(
                     companyName,
-                    style: pw.TextStyle(fontSize: 11, color: pdf.PdfColors.blueGrey600),
+                    style: const pw.TextStyle(
+                        fontSize: 11, color: pdf.PdfColors.blueGrey600),
                   ),
               ],
             ),
@@ -174,11 +177,13 @@ class PdfExportService {
         children: [
           pw.Text(
             'Generado: ${_formatDateTime(now)}',
-            style: const pw.TextStyle(fontSize: 9, color: pdf.PdfColors.grey700),
+            style:
+                const pw.TextStyle(fontSize: 9, color: pdf.PdfColors.grey700),
           ),
           pw.Text(
             'Página ${ctx.pageNumber} de ${ctx.pagesCount}',
-            style: const pw.TextStyle(fontSize: 9, color: pdf.PdfColors.grey700),
+            style:
+                const pw.TextStyle(fontSize: 9, color: pdf.PdfColors.grey700),
           ),
         ],
       ),
@@ -186,7 +191,14 @@ class PdfExportService {
   }
 
   static pw.Widget _buildTable(List<Measurement> data) {
-    const headers = <String>['#', 'Progresiva', '1 m Ω', '3 m Ω', 'Obs.', 'Fecha'];
+    const headers = <String>[
+      '#',
+      'Progresiva',
+      '1 m Ω',
+      '3 m Ω',
+      'Obs.',
+      'Fecha'
+    ];
 
     final rows = List<List<String>>.generate(data.length, (i) {
       final m = data[i];
@@ -212,7 +224,8 @@ class PdfExportService {
     return pw.TableHelper.fromTextArray(
       headers: headers,
       data: rows,
-      headerDecoration: const pw.BoxDecoration(color: pdf.PdfColors.blueGrey800),
+      headerDecoration:
+          const pw.BoxDecoration(color: pdf.PdfColors.blueGrey800),
       headerStyle: pw.TextStyle(
         color: pdf.PdfColors.white,
         fontWeight: pw.FontWeight.bold,

@@ -24,11 +24,12 @@ class MeasurementController extends ChangeNotifier {
   List<Measurement> get filtered {
     if (_filter.isEmpty) return List.unmodifiable(_all);
     final q = _filter.toLowerCase();
-    return _all.where((m) =>
-    m.progresiva.toLowerCase().contains(q) ||
-        m.observations.toLowerCase().contains(q) ||
-        m.dateString.contains(q)
-    ).toList();
+    return _all
+        .where((m) =>
+            m.progresiva.toLowerCase().contains(q) ||
+            m.observations.toLowerCase().contains(q) ||
+            m.dateString.contains(q))
+        .toList();
   }
 
   void setFilter(String query) {

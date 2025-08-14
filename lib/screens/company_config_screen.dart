@@ -62,15 +62,13 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar')
-          ),
+              child: const Text('Cancelar')),
           TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 setState(() => _color = temp);
               },
-              child: const Text('OK')
-          ),
+              child: const Text('OK')),
         ],
       ),
     );
@@ -108,8 +106,11 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                   onTap: _pickLogo,
                   child: CircleAvatar(
                     radius: 40,
-                    backgroundImage: _logoPath != null ? FileImage(File(_logoPath!)) : null,
-                    child: _logoPath == null ? const Icon(Icons.image, size: 40) : null,
+                    backgroundImage:
+                        _logoPath != null ? FileImage(File(_logoPath!)) : null,
+                    child: _logoPath == null
+                        ? const Icon(Icons.image, size: 40)
+                        : null,
                   ),
                 ),
               ),

@@ -25,7 +25,8 @@ class RowActionsSheet extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => AttachmentsGalleryScreen(measurementKey: measurementKey),
+                builder: (_) =>
+                    AttachmentsGalleryScreen(measurementKey: measurementKey),
               ));
             },
           ),

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
-  const SplashScreen({Key? key, this.onFinish}) : super(key: key);
+  const SplashScreen({super.key, this.onFinish});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -71,17 +71,17 @@ class _SplashScreenState extends State<SplashScreen>
                 Text(
                   'Grid Note',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Simplificá tus mediciones',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? Colors.white70 : Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
               ],
             ),

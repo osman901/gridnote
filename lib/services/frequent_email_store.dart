@@ -14,7 +14,9 @@ class FrequentEmailStore {
     final list = (sp.getStringList(_kKey) ?? <String>[]);
     list.removeWhere((e) => e.toLowerCase() == email.toLowerCase());
     list.insert(0, email);
-    while (list.length > _max) list.removeLast();
+    while (list.length > _max) {
+      list.removeLast();
+    }
     await sp.setStringList(_kKey, list);
   }
 }

@@ -54,7 +54,9 @@ class GridnoteTheme {
         : ThemeData.light(useMaterial3: true);
 
     // Evitamos 'background' y 'onBackground' (deprecados) usando copyWith.
-    final scheme = (isDark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
+    final scheme =
+        (isDark ? const ColorScheme.dark() : const ColorScheme.light())
+            .copyWith(
       primary: accent,
       onPrimary: isDark ? Colors.black : Colors.white,
       secondary: accent,

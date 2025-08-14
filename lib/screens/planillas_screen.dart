@@ -16,7 +16,8 @@ class PlanillasScreen extends StatefulWidget {
 class _PlanillasScreenState extends State<PlanillasScreen> {
   // Estado principal: múltiples planillas + filas por id
   final List<SheetMeta> _sheets = <SheetMeta>[];
-  final Map<String, List<Measurement>> _rowsById = <String, List<Measurement>>{};
+  final Map<String, List<Measurement>> _rowsById =
+      <String, List<Measurement>>{};
   String? _selectedId; // planilla activa (modo escritorio)
 
   @override
@@ -34,18 +35,19 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
   }
 
   List<Measurement> _sampleRows() => List.generate(
-    10,
+        10,
         (i) => Measurement(
-      progresiva: '${i + 1}',
-      ohm1m: 0.11 + i * 0.01,
-      ohm3m: 0.12 + i * 0.02,
-      observations: ['A', 'B', 'C', 'D', 'N'][i % 5],
-      date: DateTime(2011, 4, 20 + i),
-    ),
-  );
+          progresiva: '${i + 1}',
+          ohm1m: 0.11 + i * 0.01,
+          ohm3m: 0.12 + i * 0.02,
+          observations: ['A', 'B', 'C', 'D', 'N'][i % 5],
+          date: DateTime(2011, 4, 20 + i),
+        ),
+      );
 
   Future<void> _openOnMobile(SheetMeta meta) async {
-    final rows = List<Measurement>.from(_rowsById[meta.id] ?? const <Measurement>[]);
+    final rows =
+        List<Measurement>.from(_rowsById[meta.id] ?? const <Measurement>[]);
     final result = await Navigator.push<List<Measurement>>(
       context,
       MaterialPageRoute(
@@ -90,7 +92,8 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
     required VoidCallback onPressed,
     IconData icon = Icons.add_rounded,
     bool filled = true,
-    EdgeInsets padding = const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+    EdgeInsets padding =
+        const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
   }) {
     final t = widget.themeController.theme;
     final bg = filled ? t.accent : t.surface;
@@ -108,7 +111,11 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
             children: [
               Icon(icon, size: 20, color: fg),
               const SizedBox(width: 8),
-              Text(text, style: TextStyle(color: fg, fontWeight: FontWeight.w700, letterSpacing: .2)),
+              Text(text,
+                  style: TextStyle(
+                      color: fg,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .2)),
             ],
           ),
         ),
@@ -124,7 +131,8 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: t.divider),
       ),
-      child: CustomPaint(painter: _GhostLinesPainter(t.divider.withValues(alpha: .55))),
+      child: CustomPaint(
+          painter: _GhostLinesPainter(t.divider.withValues(alpha: .55))),
     );
   }
 
@@ -134,19 +142,30 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
         color: t.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: t.divider),
-        boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 14, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x12000000), blurRadius: 14, offset: Offset(0, 4))
+        ],
       ),
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.insert_drive_file_rounded, size: 52, color: t.text.withValues(alpha: .28)),
+          Icon(Icons.insert_drive_file_rounded,
+              size: 52, color: t.text.withValues(alpha: .28)),
           const SizedBox(height: 16),
-          Text('Bienvenido 👋', textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: t.text)),
+          Text('Bienvenido 👋',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 26, fontWeight: FontWeight.w800, color: t.text)),
           const SizedBox(height: 8),
-          Text('Creá una planilla nueva o importá un archivo CSV.', textAlign: TextAlign.center, style: TextStyle(color: t.textFaint)),
+          Text('Creá una planilla nueva o importá un archivo CSV.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: t.textFaint)),
           const SizedBox(height: 18),
-          _pill(text: 'Crear planilla', onPressed: () => _createSheet(push: true)),
+          _pill(
+              text: 'Crear planilla',
+              onPressed: () => _createSheet(push: true)),
           const SizedBox(height: 12),
           TextButton(onPressed: () {}, child: const Text('Importar CSV')),
         ],
@@ -154,7 +173,8 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
     );
   }
 
-  Widget _sheetTile(BuildContext context, SheetMeta meta, {VoidCallback? onTap}) {
+  Widget _sheetTile(BuildContext context, SheetMeta meta,
+      {VoidCallback? onTap}) {
     final t = widget.themeController.theme;
     return ListTile(
       leading: const Icon(Icons.grid_on_rounded),
@@ -183,14 +203,17 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
         return Scaffold(
           backgroundColor: t.scaffold,
           appBar: AppBar(
-            title: const Text('Gridnote', style: TextStyle(fontWeight: FontWeight.w800)),
+            title: const Text('Gridnote',
+                style: TextStyle(fontWeight: FontWeight.w800)),
             backgroundColor: t.scaffold,
             elevation: 0,
             centerTitle: false,
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 12),
-                child: _pill(text: 'Nueva planilla', onPressed: () => _createSheet(push: true)),
+                child: _pill(
+                    text: 'Nueva planilla',
+                    onPressed: () => _createSheet(push: true)),
               ),
             ],
           ),
@@ -201,7 +224,11 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
                 children: [
                   Icon(Icons.history, color: t.text.withValues(alpha: .9)),
                   const SizedBox(width: 10),
-                  Text('Recientes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: t.text)),
+                  Text('Recientes',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: t.text)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -210,7 +237,8 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
                 const SizedBox(height: 18),
                 _welcome(t),
               ] else ...[
-                for (final meta in _sheets) _sheetTile(context, meta, onTap: () => _openOnMobile(meta)),
+                for (final meta in _sheets)
+                  _sheetTile(context, meta, onTap: () => _openOnMobile(meta)),
               ],
             ],
           ),
@@ -219,8 +247,9 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
 
       // ===== Desktop / Tablet (two panes) =====
       final selected = _sheets.firstWhere(
-            (m) => m.id == _selectedId,
-        orElse: () => _sheets.isEmpty ? SheetMeta(id: '', name: '') : _sheets.first,
+        (m) => m.id == _selectedId,
+        orElse: () =>
+            _sheets.isEmpty ? SheetMeta(id: '', name: '') : _sheets.first,
       );
       final hasSelection = _sheets.isNotEmpty && selected.id.isNotEmpty;
 
@@ -239,25 +268,37 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                   children: [
-                    Text('Gridnote', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: t.text)),
+                    Text('Gridnote',
+                        style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: t.text)),
                     const SizedBox(height: 16),
-                    _pill(text: 'Nueva planilla', onPressed: () => _createSheet(push: false)),
+                    _pill(
+                        text: 'Nueva planilla',
+                        onPressed: () => _createSheet(push: false)),
                     const SizedBox(height: 18),
-                    Text('Recientes', style: TextStyle(fontWeight: FontWeight.w700, color: t.text)),
+                    Text('Recientes',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: t.text)),
                     const SizedBox(height: 8),
                     if (_sheets.isEmpty)
                       ListTile(
                         leading: const Icon(Icons.inbox_outlined),
-                        title: Text('Sin planillas', style: TextStyle(color: t.textFaint)),
+                        title: Text('Sin planillas',
+                            style: TextStyle(color: t.textFaint)),
                       )
                     else
                       ..._sheets.map(
-                            (m) => Container(
+                        (m) => Container(
                           decoration: BoxDecoration(
-                            color: m.id == _selectedId ? t.accent.withOpacity(.08) : null,
+                            color: m.id == _selectedId
+                                ? t.accent.withOpacity(.08)
+                                : null,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: _sheetTile(context, m, onTap: () => _selectOnDesktop(m)),
+                          child: _sheetTile(context, m,
+                              onTap: () => _selectOnDesktop(m)),
                         ),
                       ),
                   ],
@@ -275,15 +316,27 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       decoration: BoxDecoration(
                         color: t.scaffold,
-                        border: Border(bottom: BorderSide(color: table.gridLine)),
+                        border:
+                            Border(bottom: BorderSide(color: table.gridLine)),
                       ),
                       child: Row(
                         children: [
-                          Text('Planillas', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: t.text)),
+                          Text('Planillas',
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: t.text)),
                           const Spacer(),
-                          IconButton(tooltip: 'Más', onPressed: () {}, icon: const Icon(Icons.more_horiz_rounded)),
+                          IconButton(
+                              tooltip: 'Más',
+                              onPressed: () {},
+                              icon: const Icon(Icons.more_horiz_rounded)),
                           const SizedBox(width: 8),
-                          _pill(text: 'Compartir', icon: Icons.ios_share_rounded, onPressed: () {}, filled: false),
+                          _pill(
+                              text: 'Compartir',
+                              icon: Icons.ios_share_rounded,
+                              onPressed: () {},
+                              filled: false),
                         ],
                       ),
                     ),
@@ -292,20 +345,23 @@ class _PlanillasScreenState extends State<PlanillasScreen> {
                     Expanded(
                       child: hasSelection
                           ? SheetScreen(
-                        key: ValueKey(_selectedId), // fuerza rebuild al cambiar selección
-                        id: selected.id,
-                        meta: selected,
-                        initial: _rowsById[selected.id] ?? const <Measurement>[],
-                        themeController: widget.themeController,
-                      )
+                              key: ValueKey(
+                                  _selectedId), // fuerza rebuild al cambiar selección
+                              id: selected.id,
+                              meta: selected,
+                              initial: _rowsById[selected.id] ??
+                                  const <Measurement>[],
+                              themeController: widget.themeController,
+                            )
                           : ListView(
-                        padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
-                        children: [
-                          _ghostSheet(t),
-                          const SizedBox(height: 18),
-                          _welcome(t),
-                        ],
-                      ),
+                              padding:
+                                  const EdgeInsets.fromLTRB(24, 18, 24, 28),
+                              children: [
+                                _ghostSheet(t),
+                                const SizedBox(height: 18),
+                                _welcome(t),
+                              ],
+                            ),
                     ),
                   ],
                 ),
@@ -330,16 +386,19 @@ class _GhostLinesPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
-    final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(20));
+    final r =
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(20));
     canvas.drawRRect(r, p);
 
     final rowH = size.height / 4;
     for (int i = 1; i <= 3; i++) {
       final y = rowH * i;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p..color = color.withValues(alpha: .5));
+      canvas.drawLine(Offset(0, y), Offset(size.width, y),
+          p..color = color.withValues(alpha: .5));
     }
     final colW = size.width / 3;
-    canvas.drawLine(Offset(colW, 0), Offset(colW, rowH), p..color = color.withValues(alpha: .5));
+    canvas.drawLine(Offset(colW, 0), Offset(colW, rowH),
+        p..color = color.withValues(alpha: .5));
     canvas.drawLine(Offset(colW * 2, 0), Offset(colW * 2, rowH), p);
   }
 

@@ -11,7 +11,8 @@ class Validators {
     return null;
   }
 
-  static String? minValue(double min, String? value, {String msg = 'Valor bajo'}) {
+  static String? minValue(double min, String? value,
+      {String msg = 'Valor bajo'}) {
     if (value == null) return null;
     final val = double.tryParse(value.replaceAll(',', '.'));
     if (val != null && val < min) return msg;

@@ -33,32 +33,34 @@ class NoteCard extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         leading: (note.imagePath != null && note.imagePath!.isNotEmpty)
             ? ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            File(note.imagePath!),
-            width: 48,
-            height: 48,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Icon(
-              Icons.image_not_supported_outlined,
-              size: 36,
-              color: theme.colorScheme.secondary,
-            ),
-          ),
-        )
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(note.imagePath!),
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 36,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              )
             : Icon(
-          Icons.note_alt_outlined,
-          size: 36,
-          color: theme.colorScheme.secondary,
-        ),
+                Icons.note_alt_outlined,
+                size: 36,
+                color: theme.colorScheme.secondary,
+              ),
         title: Text(
           note.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           note.content,

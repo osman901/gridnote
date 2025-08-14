@@ -20,22 +20,22 @@ class AuditEvent {
   });
 
   Map<String, dynamic> toJson() => {
-    'ts': ts.toIso8601String(),
-    'action': action,
-    'field': field,
-    'old': oldValue,
-    'new': newValue,
-    'key': key,
-  };
+        'ts': ts.toIso8601String(),
+        'action': action,
+        'field': field,
+        'old': oldValue,
+        'new': newValue,
+        'key': key,
+      };
 
   static AuditEvent fromJson(Map<String, dynamic> j) => AuditEvent(
-    ts: DateTime.tryParse(j['ts'] ?? '') ?? DateTime.now(),
-    action: j['action'] ?? '',
-    field: j['field'] ?? '',
-    oldValue: j['old'],
-    newValue: j['new'],
-    key: j['key'],
-  );
+        ts: DateTime.tryParse(j['ts'] ?? '') ?? DateTime.now(),
+        action: j['action'] ?? '',
+        field: j['field'] ?? '',
+        oldValue: j['old'],
+        newValue: j['new'],
+        key: j['key'],
+      );
 }
 
 class AuditService {

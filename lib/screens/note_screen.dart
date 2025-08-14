@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class NoteScreen extends StatefulWidget {
   final ValueChanged<String> onTextSubmitted;
-  const NoteScreen({Key? key, required this.onTextSubmitted}) : super(key: key);
+  const NoteScreen({super.key, required this.onTextSubmitted});
 
   @override
   State<NoteScreen> createState() => _NoteScreenState();

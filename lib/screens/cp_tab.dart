@@ -137,7 +137,10 @@ class _CathodicProtectionTabState extends State<CathodicProtectionTab> {
         onPressed: _isSaving ? null : _export,
         icon: _isSaving
             ? const SizedBox(
-            width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.save_alt),
         label: Text(_isSaving ? 'Exportando…' : 'Exportar'),
       ),

@@ -7,18 +7,18 @@ import '../models/measurement.dart';
 
 class MeasurementDataSource extends DataGridSource {
   MeasurementDataSource(
-      List<Measurement> data, {
-        int rowsPerPage = 10,
-        this.showIndexColumn = false,
-        this.rowColor,
-        this.altRowColor,
-        this.cellTextStyle,
-        this.cellPadding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        this.indexTextStyle,
-        this.indexWidth = 44,
-        this.minVisibleRows = 20,
-        this.onTapMaps,
-      })  : _all = List<Measurement>.from(data),
+    List<Measurement> data, {
+    int rowsPerPage = 10,
+    this.showIndexColumn = false,
+    this.rowColor,
+    this.altRowColor,
+    this.cellTextStyle,
+    this.cellPadding = const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    this.indexTextStyle,
+    this.indexWidth = 44,
+    this.minVisibleRows = 20,
+    this.onTapMaps,
+  })  : _all = List<Measurement>.from(data),
         _rowsPerPage = rowsPerPage {
     _rebuildSlice();
   }
@@ -63,7 +63,8 @@ class MeasurementDataSource extends DataGridSource {
     _applyEdit(op.index, op.column, op.newValue, pushTo: _undo, asNew: false);
   }
 
-  void _applyEdit(int index, String column, dynamic value, {List<_EditOp>? pushTo, required bool asNew}) {
+  void _applyEdit(int index, String column, dynamic value,
+      {List<_EditOp>? pushTo, required bool asNew}) {
     if (index < 0 || index >= _all.length) return;
     final m = _all[index];
     dynamic oldVal;
@@ -141,7 +142,10 @@ class MeasurementDataSource extends DataGridSource {
           width: indexWidth,
           color: bg,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text('${globalIndex + 1}', style: indexTextStyle ?? cellTextStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Text('${globalIndex + 1}',
+              style: indexTextStyle ?? cellTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ),
       );
     }
@@ -156,7 +160,8 @@ class MeasurementDataSource extends DataGridSource {
             child: IconButton(
               icon: const Icon(Icons.open_in_new_rounded, size: 18),
               tooltip: hasCoords ? 'Abrir en Maps' : 'Sin ubicación',
-              onPressed: (hasCoords && m != null) ? () => onTapMaps?.call(m) : null,
+              onPressed:
+                  (hasCoords && m != null) ? () => onTapMaps?.call(m) : null,
             ),
           ),
         );
@@ -178,7 +183,10 @@ class MeasurementDataSource extends DataGridSource {
           alignment: Alignment.centerLeft,
           color: bg,
           padding: cellPadding,
-          child: Text('${c.value ?? ''}', style: cellTextStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: Text('${c.value ?? ''}',
+              style: cellTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ),
       );
     }
@@ -190,22 +198,27 @@ class MeasurementDataSource extends DataGridSource {
 
   @override
   Widget? buildEditWidget(
-      DataGridRow dataGridRow,
-      RowColumnIndex rowColumnIndex,
-      GridColumn column,
-      CellSubmit submitCell,
-      ) {
-    if (column.columnName == 'maps' || column.columnName == '_edit') return null;
+    DataGridRow dataGridRow,
+    RowColumnIndex rowColumnIndex,
+    GridColumn column,
+    CellSubmit submitCell,
+  ) {
+    if (column.columnName == 'maps' || column.columnName == '_edit') {
+      return null;
+    }
 
     final String columnName = column.columnName;
-    final Object? currentValue =
-        dataGridRow.getCells().firstWhere((c) => c.columnName == columnName).value;
+    final Object? currentValue = dataGridRow
+        .getCells()
+        .firstWhere((c) => c.columnName == columnName)
+        .value;
 
     final visibleIndex = rowColumnIndex.rowIndex - 1;
     final bg = (visibleIndex.isEven ? rowColor : altRowColor);
 
     final isNumeric = columnName == 'ohm1m' || columnName == 'ohm3m';
-    _editingController = TextEditingController(text: currentValue?.toString() ?? '');
+    _editingController =
+        TextEditingController(text: currentValue?.toString() ?? '');
     _pendingValue = _editingController!.text;
 
     return Container(
@@ -220,7 +233,9 @@ class MeasurementDataSource extends DataGridSource {
             : TextInputType.text,
         // Regex sin escapes redundantes y con '-' seguro dentro del set
         inputFormatters: isNumeric
-            ? <TextInputFormatter>[FilteringTextInputFormatter.allow(RegExp(r'[0-9,.\-]'))]
+            ? <TextInputFormatter>[
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9,.\-]'))
+              ]
             : null,
         textInputAction: TextInputAction.done,
         style: cellTextStyle,
@@ -229,7 +244,8 @@ class MeasurementDataSource extends DataGridSource {
         smartDashesType: SmartDashesType.disabled,
         smartQuotesType: SmartQuotesType.disabled,
         scrollPadding: EdgeInsets.zero,
-        decoration: const InputDecoration(isCollapsed: true, border: InputBorder.none, counterText: ''),
+        decoration: const InputDecoration(
+            isCollapsed: true, border: InputBorder.none, counterText: ''),
         onChanged: (v) => _pendingValue = v,
         onSubmitted: (_) => submitCell(),
         onTapOutside: (_) => submitCell(),
@@ -251,10 +267,10 @@ class MeasurementDataSource extends DataGridSource {
 
   @override
   Future<void> onCellSubmit(
-      DataGridRow dataGridRow,
-      RowColumnIndex rowColumnIndex,
-      GridColumn column,
-      ) async {
+    DataGridRow dataGridRow,
+    RowColumnIndex rowColumnIndex,
+    GridColumn column,
+  ) async {
     final dynamic newValue = _pendingValue;
     _pendingValue = null;
 
@@ -294,7 +310,8 @@ class MeasurementDataSource extends DataGridSource {
         break;
     }
 
-    _applyEdit(globalIndex, column.columnName, newValue, pushTo: _undo, asNew: true);
+    _applyEdit(globalIndex, column.columnName, newValue,
+        pushTo: _undo, asNew: true);
     if (_undo.isNotEmpty) {
       _undo[_undo.length - 1] =
           _EditOp(globalIndex, column.columnName, oldV, newValue);
@@ -348,7 +365,8 @@ class MeasurementDataSource extends DataGridSource {
     _all
       ..clear()
       ..addAll(items);
-    _startIndex = min(_startIndex, max(0, max(_all.length, minVisibleRows) - 1));
+    _startIndex =
+        min(_startIndex, max(0, max(_all.length, minVisibleRows) - 1));
     _rebuildSlice();
     notifyListeners();
   }
@@ -374,28 +392,28 @@ class MeasurementDataSource extends DataGridSource {
   }
 
   DataGridRow _rowFrom(Measurement m) => DataGridRow(cells: [
-    DataGridCell<String>(columnName: 'progresiva', value: m.progresiva),
-    DataGridCell<double?>(columnName: 'ohm1m', value: m.ohm1m),
-    DataGridCell<double?>(columnName: 'ohm3m', value: m.ohm3m),
-    DataGridCell<String>(columnName: 'observations', value: m.observations),
-    DataGridCell<String>(
-      columnName: 'date',
-      value:
-      '${m.date.day.toString().padLeft(2, '0')}/${m.date.month.toString().padLeft(2, '0')}/${m.date.year}',
-    ),
-    const DataGridCell<String>(columnName: 'maps', value: ''),
-    const DataGridCell<String>(columnName: '_edit', value: ''),
-  ]);
+        DataGridCell<String>(columnName: 'progresiva', value: m.progresiva),
+        DataGridCell<double?>(columnName: 'ohm1m', value: m.ohm1m),
+        DataGridCell<double?>(columnName: 'ohm3m', value: m.ohm3m),
+        DataGridCell<String>(columnName: 'observations', value: m.observations),
+        DataGridCell<String>(
+          columnName: 'date',
+          value:
+              '${m.date.day.toString().padLeft(2, '0')}/${m.date.month.toString().padLeft(2, '0')}/${m.date.year}',
+        ),
+        const DataGridCell<String>(columnName: 'maps', value: ''),
+        const DataGridCell<String>(columnName: '_edit', value: ''),
+      ]);
 
   DataGridRow _ghostRow() => const DataGridRow(cells: [
-    DataGridCell<String>(columnName: 'progresiva', value: ''),
-    DataGridCell<double?>(columnName: 'ohm1m', value: null),
-    DataGridCell<double?>(columnName: 'ohm3m', value: null),
-    DataGridCell<String>(columnName: 'observations', value: ''),
-    DataGridCell<String>(columnName: 'date', value: ''),
-    DataGridCell<String>(columnName: 'maps', value: ''),
-    DataGridCell<String>(columnName: '_edit', value: ''),
-  ]);
+        DataGridCell<String>(columnName: 'progresiva', value: ''),
+        DataGridCell<double?>(columnName: 'ohm1m', value: null),
+        DataGridCell<double?>(columnName: 'ohm3m', value: null),
+        DataGridCell<String>(columnName: 'observations', value: ''),
+        DataGridCell<String>(columnName: 'date', value: ''),
+        DataGridCell<String>(columnName: 'maps', value: ''),
+        DataGridCell<String>(columnName: '_edit', value: ''),
+      ]);
 
   static num? _toNum(Object? v) {
     if (v == null) return null;
@@ -411,11 +429,13 @@ class MeasurementDataSource extends DataGridSource {
     final yyyymmdd = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$');
     if (ddmmyyyy.hasMatch(s)) {
       final m = ddmmyyyy.firstMatch(s)!;
-      return DateTime(int.parse(m.group(3)!), int.parse(m.group(2)!), int.parse(m.group(1)!));
+      return DateTime(int.parse(m.group(3)!), int.parse(m.group(2)!),
+          int.parse(m.group(1)!));
     }
     if (yyyymmdd.hasMatch(s)) {
       final m = yyyymmdd.firstMatch(s)!;
-      return DateTime(int.parse(m.group(1)!), int.parse(m.group(2)!), int.parse(m.group(3)!));
+      return DateTime(int.parse(m.group(1)!), int.parse(m.group(2)!),
+          int.parse(m.group(3)!));
     }
     return DateTime.tryParse(s);
   }

@@ -26,22 +26,23 @@ class SheetStorageService {
     if (raw is List) {
       return raw
           .map<Map<String, dynamic>>((e) =>
-      (e is Map) ? Map<String, dynamic>.from(e) : <String, dynamic>{})
+              (e is Map) ? Map<String, dynamic>.from(e) : <String, dynamic>{})
           .toList(growable: true);
     }
     return <Map<String, dynamic>>[];
   }
 
-  Future<void> writeRows(String sheetId, List<Map<String, dynamic>> rows) async {
+  Future<void> writeRows(
+      String sheetId, List<Map<String, dynamic>> rows) async {
     final list = rows.map((m) => Map<String, dynamic>.from(m)).toList();
     await _box.put(sheetId, list);
   }
 
   Future<void> upsertRow(
-      String sheetId, {
-        required int index,
-        required Map<String, dynamic> row,
-      }) async {
+    String sheetId, {
+    required int index,
+    required Map<String, dynamic> row,
+  }) async {
     final rows = readRows(sheetId);
     if (index < 0) return;
     if (index >= rows.length) {

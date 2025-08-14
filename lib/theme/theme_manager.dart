@@ -44,18 +44,22 @@ class ThemeManager extends ChangeNotifier {
         return _baseGray(platformBrightness);
       case AppTheme.system:
       default:
-        return platformBrightness == Brightness.dark ? _baseDark() : _baseLight();
+        return platformBrightness == Brightness.dark
+            ? _baseDark()
+            : _baseLight();
     }
   }
 
   // ====== Paletas ======
   ThemeData _baseLight() {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0), brightness: Brightness.light);
+    final scheme = ColorScheme.fromSeed(
+        seedColor: const Color(0xFF1565C0), brightness: Brightness.light);
     return _applyCommon(ThemeData(colorScheme: scheme, useMaterial3: true));
   }
 
   ThemeData _baseDark() {
-    final scheme = ColorScheme.fromSeed(seedColor: const Color(0xFF00BCD4), brightness: Brightness.dark);
+    final scheme = ColorScheme.fromSeed(
+        seedColor: const Color(0xFF00BCD4), brightness: Brightness.dark);
     return _applyCommon(ThemeData(colorScheme: scheme, useMaterial3: true));
   }
 
@@ -69,10 +73,12 @@ class ThemeManager extends ChangeNotifier {
       onSecondary: Colors.white,
       error: const Color(0xFFEF5350),
       onError: Colors.white,
-      background: platformBrightness == Brightness.dark ? const Color(0xFF111111) : const Color(0xFFF4F4F4),
-      onBackground: platformBrightness == Brightness.dark ? Colors.white : const Color(0xFF1E1E1E),
-      surface: platformBrightness == Brightness.dark ? const Color(0xFF1A1A1A) : Colors.white,
-      onSurface: platformBrightness == Brightness.dark ? Colors.white : const Color(0xFF1E1E1E),
+      surface: platformBrightness == Brightness.dark
+          ? const Color(0xFF1A1A1A)
+          : Colors.white,
+      onSurface: platformBrightness == Brightness.dark
+          ? Colors.white
+          : const Color(0xFF1E1E1E),
       shadow: Colors.black.withOpacity(.3),
       outline: const Color(0xFF9E9E9E),
       outlineVariant: const Color(0xFFE0E0E0),
@@ -83,8 +89,11 @@ class ThemeManager extends ChangeNotifier {
       onPrimaryContainer: Colors.white,
       secondaryContainer: const Color(0xFFEEEEEE),
       onSecondaryContainer: const Color(0xFF1E1E1E),
-      surfaceVariant: platformBrightness == Brightness.dark ? const Color(0xFF202020) : const Color(0xFFF2F2F2),
-      inverseSurface: platformBrightness == Brightness.dark ? Colors.white : Colors.black,
+      surfaceContainerHighest: platformBrightness == Brightness.dark
+          ? const Color(0xFF202020)
+          : const Color(0xFFF2F2F2),
+      inverseSurface:
+          platformBrightness == Brightness.dark ? Colors.white : Colors.black,
       inversePrimary: const Color(0xFFBDBDBD),
       scrim: Colors.black87,
     );
@@ -99,8 +108,10 @@ class ThemeManager extends ChangeNotifier {
         elevation: 1,
         centerTitle: false,
       ),
-      snackBarTheme: base.snackBarTheme.copyWith(behavior: SnackBarBehavior.floating),
-      inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+      snackBarTheme:
+          base.snackBarTheme.copyWith(behavior: SnackBarBehavior.floating),
+      inputDecorationTheme:
+          const InputDecorationTheme(border: OutlineInputBorder()),
       dividerColor: base.colorScheme.outline.withOpacity(.3),
     );
   }

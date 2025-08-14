@@ -20,7 +20,8 @@ class AttachmentService {
     );
     if (x == null) return null;
     final dir = await dirForKey(key);
-    final name = 'att_${DateTime.now().millisecondsSinceEpoch}${p.extension(x.path).toLowerCase()}';
+    final name =
+        'att_${DateTime.now().millisecondsSinceEpoch}${p.extension(x.path).toLowerCase()}';
     final dest = File(p.join(dir.path, name));
     return File(x.path).copy(dest.path);
   }

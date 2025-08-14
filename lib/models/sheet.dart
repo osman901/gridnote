@@ -7,13 +7,20 @@ part 'sheet.g.dart';
 /// Modelo de una planilla. Contiene metadatos (id, nombre, fechas, ubicación opcional).
 @HiveType(typeId: 100)
 class SheetMeta {
-  @HiveField(0) final String id;
-  @HiveField(1) String name;
-  @HiveField(2) DateTime createdAt;
-  @HiveField(3) DateTime updatedAt;
-  @HiveField(4) double? lat;
-  @HiveField(5) double? lon;
-  @HiveField(6) String? cloudUrl;
+  @HiveField(0)
+  final String id;
+  @HiveField(1)
+  String name;
+  @HiveField(2)
+  DateTime createdAt;
+  @HiveField(3)
+  DateTime updatedAt;
+  @HiveField(4)
+  double? lat;
+  @HiveField(5)
+  double? lon;
+  @HiveField(6)
+  String? cloudUrl;
 
   SheetMeta({
     required this.id,
@@ -104,8 +111,7 @@ class SheetsStore {
     final idx = _meta.values.toList().indexWhere((e) => e.id == sheet.id);
     if (idx != -1) {
       final key = _meta.keyAt(idx);
-      final updated =
-      sheet.copyWith(name: newName, updatedAt: DateTime.now());
+      final updated = sheet.copyWith(name: newName, updatedAt: DateTime.now());
       await _meta.put(key, updated);
     }
   }

@@ -8,10 +8,10 @@ class EditableTable extends StatefulWidget {
   final void Function(List<Measurement>)? onChanged;
 
   const EditableTable({
-    Key? key,
+    super.key,
     required this.data,
     this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<EditableTable> createState() => _EditableTableState();
@@ -89,21 +89,27 @@ class _EditableTableState extends State<EditableTable> {
 
   TableRow _buildHeaderRow() {
     const headers = <String>[
-      'Progresiva', 'Ohm 1m', 'Ohm 3m', 'Observaciones', 'Latitud', 'Longitud', 'Fecha'
+      'Progresiva',
+      'Ohm 1m',
+      'Ohm 3m',
+      'Observaciones',
+      'Latitud',
+      'Longitud',
+      'Fecha'
     ];
     return TableRow(
       decoration: BoxDecoration(color: Colors.grey.shade900),
       children: headers
           .map((h) => Padding(
-        padding: const EdgeInsets.all(8),
-        child: Text(
-          h,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ))
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  h,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ))
           .toList(),
     );
   }
@@ -120,17 +126,18 @@ class _EditableTableState extends State<EditableTable> {
         _cell(c['longitude']!, numeric: true, onSaved: () => _saveRow(i)),
         Padding(
           padding: const EdgeInsets.all(8),
-          child: Text(m.dateString, style: const TextStyle(color: Colors.white)),
+          child:
+              Text(m.dateString, style: const TextStyle(color: Colors.white)),
         ),
       ],
     );
   }
 
   Widget _cell(
-      TextEditingController controller, {
-        bool numeric = false,
-        required VoidCallback onSaved,
-      }) {
+    TextEditingController controller, {
+    bool numeric = false,
+    required VoidCallback onSaved,
+  }) {
     return Padding(
       padding: const EdgeInsets.all(4),
       child: Focus(
@@ -139,8 +146,9 @@ class _EditableTableState extends State<EditableTable> {
         },
         child: TextField(
           controller: controller,
-          keyboardType:
-          numeric ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          keyboardType: numeric
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             isDense: true,
@@ -163,7 +171,8 @@ class _EditableTableState extends State<EditableTable> {
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
           _buildHeaderRow(),
-          for (var i = 0; i < widget.data.length; i++) _buildEditableRow(i, widget.data[i]),
+          for (var i = 0; i < widget.data.length; i++)
+            _buildEditableRow(i, widget.data[i]),
         ],
       ),
     );

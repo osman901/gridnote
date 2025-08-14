@@ -7,40 +7,44 @@ class AppThemes {
     brightness: Brightness.light,
     primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.backgroundLight,
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surface,
-      iconTheme: const IconThemeData(color: AppColors.primary),
-      titleTextStyle: const TextStyle(
-        color: AppColors.primary, fontSize: 20, fontWeight: FontWeight.bold,
+      iconTheme: IconThemeData(color: AppColors.primary),
+      titleTextStyle: TextStyle(
+        color: AppColors.primary,
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
       ),
       elevation: 1.8,
     ),
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: AppColors.primary,
       secondary: AppColors.accent,
       surface: AppColors.surface,
-      background: AppColors.backgroundLight,
       error: AppColors.error,
       onPrimary: AppColors.textLight,
       onSurface: AppColors.text,
-      onBackground: AppColors.text,
     ),
     textTheme: const TextTheme(
       bodyMedium: TextStyle(color: AppColors.text, fontSize: 16),
       bodyLarge: TextStyle(color: AppColors.text, fontSize: 18),
-      labelLarge: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
-      titleLarge: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
+      labelLarge:
+          TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
+      titleLarge: TextStyle(
+          color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
     ),
-    inputDecorationTheme: InputDecorationTheme(
+    inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surface,
-      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10.0))),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(10.0))),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textLight,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         textStyle: const TextStyle(fontWeight: FontWeight.bold),
       ),
     ),
@@ -50,40 +54,44 @@ class AppThemes {
     brightness: Brightness.dark,
     primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.backgroundDark,
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surfaceDark,
-      iconTheme: const IconThemeData(color: AppColors.primary),
-      titleTextStyle: const TextStyle(
-        color: AppColors.primary, fontSize: 20, fontWeight: FontWeight.bold,
+      iconTheme: IconThemeData(color: AppColors.primary),
+      titleTextStyle: TextStyle(
+        color: AppColors.primary,
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
       ),
       elevation: 1.8,
     ),
-    colorScheme: ColorScheme.dark(
+    colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,
       secondary: AppColors.accent,
       surface: AppColors.surfaceDark,
-      background: AppColors.backgroundDark,
       error: AppColors.error,
       onPrimary: AppColors.textLight,
       onSurface: AppColors.textLight,
-      onBackground: AppColors.textLight,
     ),
     textTheme: const TextTheme(
       bodyMedium: TextStyle(color: AppColors.textLight, fontSize: 16),
       bodyLarge: TextStyle(color: AppColors.textLight, fontSize: 18),
-      labelLarge: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
-      titleLarge: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
+      labelLarge:
+          TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500),
+      titleLarge: TextStyle(
+          color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
     ),
-    inputDecorationTheme: InputDecorationTheme(
+    inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surfaceDark,
-      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10.0))),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(10.0))),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textLight,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         textStyle: const TextStyle(fontWeight: FontWeight.bold),
       ),
     ),

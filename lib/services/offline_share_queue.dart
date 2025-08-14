@@ -54,7 +54,8 @@ class OfflineShareQueue {
       final item = Map<String, dynamic>.from(box.get(k) as Map);
       try {
         final x = XFile(item['path'] as String,
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            mimeType:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         await Share.shareXFiles([x],
             subject: item['subject'] as String?, text: item['text'] as String?);
         await box.delete(k); // solo si se invocó el share sin excepciones

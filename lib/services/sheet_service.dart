@@ -31,20 +31,20 @@ class SheetMeta {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toIso8601String(),
-    'latitude': latitude,
-    'longitude': longitude,
-  };
+        'id': id,
+        'name': name,
+        'createdAt': createdAt.toIso8601String(),
+        'latitude': latitude,
+        'longitude': longitude,
+      };
 
   static SheetMeta fromJson(Map<String, dynamic> j) => SheetMeta(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    createdAt: DateTime.tryParse(j['createdAt'] ?? '') ?? DateTime.now(),
-    latitude: (j['latitude'] as num?)?.toDouble(),
-    longitude: (j['longitude'] as num?)?.toDouble(),
-  );
+        id: j['id'] as String,
+        name: j['name'] as String,
+        createdAt: DateTime.tryParse(j['createdAt'] ?? '') ?? DateTime.now(),
+        latitude: (j['latitude'] as num?)?.toDouble(),
+        longitude: (j['longitude'] as num?)?.toDouble(),
+      );
 
   static String encodeList(List<SheetMeta> list) =>
       jsonEncode(list.map((e) => e.toJson()).toList());

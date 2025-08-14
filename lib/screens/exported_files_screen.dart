@@ -73,22 +73,24 @@ class _ExportedFilesScreenState extends State<ExportedFilesScreen> {
                         break;
                       case 'delete':
                         final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Eliminar archivo'),
-                            content: Text('¿Eliminar “${it.name}”?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                title: const Text('Eliminar archivo'),
+                                content: Text('¿Eliminar “${it.name}”?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancelar'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text('Eliminar'),
+                                  ),
+                                ],
                               ),
-                              FilledButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Eliminar'),
-                              ),
-                            ],
-                          ),
-                        ) ??
+                            ) ??
                             false;
                         if (!ok) return;
                         try {
@@ -97,7 +99,8 @@ class _ExportedFilesScreenState extends State<ExportedFilesScreen> {
                         } catch (_) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No se pudo eliminar.')),
+                            const SnackBar(
+                                content: Text('No se pudo eliminar.')),
                           );
                         }
                         break;

@@ -19,9 +19,9 @@ class ExcelTemplateService {
   }
 
   List<String> get sheets => List.generate(
-    _wb.worksheets.count,
+        _wb.worksheets.count,
         (i) => _wb.worksheets[i].name,
-  );
+      );
 
   Worksheet _sheetByName(String name) {
     for (var i = 0; i < _wb.worksheets.count; i++) {
@@ -52,7 +52,8 @@ class ExcelTemplateService {
   }
 
   /// Escribe todas las mediciones a una hoja (incluyendo lat/lon)
-  void writeMeasurementsSheet(String sheetName, List<Measurement> measurements) {
+  void writeMeasurementsSheet(
+      String sheetName, List<Measurement> measurements) {
     final ws = _sheetByName(sheetName);
 
     // Encabezados
@@ -68,7 +69,7 @@ class ExcelTemplateService {
     for (int c = 0; c < headers.length; c++) {
       ws.getRangeByIndex(1, c + 1).setText(headers[c]);
     }
-    ws.getRangeByName('A1:G1').cellStyle..bold = true;
+    ws.getRangeByName('A1:G1').cellStyle.bold = true;
 
     // Filas
     for (int r = 0; r < measurements.length; r++) {

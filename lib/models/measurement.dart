@@ -7,15 +7,24 @@ part 'measurement.g.dart';
 class Measurement {
   /// Nota: No uses este `id` como clave de Hive. Hive gestiona su propia key
   /// (autoincremental o string). Este `id` es para integraciones externas.
-  @HiveField(0) int? id;
-  @HiveField(1) String progresiva;
-  @HiveField(2) double ohm1m;
-  @HiveField(3) double ohm3m;
-  @HiveField(4) String observations;
-  @HiveField(5) double? latitude;
-  @HiveField(6) double? longitude;
+  @HiveField(0)
+  int? id;
+  @HiveField(1)
+  String progresiva;
+  @HiveField(2)
+  double ohm1m;
+  @HiveField(3)
+  double ohm3m;
+  @HiveField(4)
+  String observations;
+  @HiveField(5)
+  double? latitude;
+  @HiveField(6)
+  double? longitude;
+
   /// Guardar SIEMPRE en UTC para consistencia.
-  @HiveField(7) DateTime date;
+  @HiveField(7)
+  DateTime date;
 
   Measurement({
     this.id,
@@ -30,12 +39,12 @@ class Measurement {
 
   /// Fábrica vacía usando UTC.
   factory Measurement.empty() => Measurement(
-    progresiva: '',
-    ohm1m: 0,
-    ohm3m: 0,
-    observations: '',
-    date: DateTime.now().toUtc(),
-  );
+        progresiva: '',
+        ohm1m: 0,
+        ohm3m: 0,
+        observations: '',
+        date: DateTime.now().toUtc(),
+      );
 
   /// Fecha formateada en zona local del dispositivo.
   String get dateString {
@@ -65,16 +74,16 @@ class Measurement {
       );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'progresiva': progresiva,
-    'ohm1m': ohm1m,
-    'ohm3m': ohm3m,
-    'observations': observations,
-    'latitude': latitude,
-    'longitude': longitude,
-    // Guardamos epoch en ms de la versión UTC
-    'date': date.toUtc().millisecondsSinceEpoch,
-  };
+        'id': id,
+        'progresiva': progresiva,
+        'ohm1m': ohm1m,
+        'ohm3m': ohm3m,
+        'observations': observations,
+        'latitude': latitude,
+        'longitude': longitude,
+        // Guardamos epoch en ms de la versión UTC
+        'date': date.toUtc().millisecondsSinceEpoch,
+      };
 
   /// fromJson ESTRICTO: si falta un campo requerido, lanza FormatException.
   factory Measurement.fromJson(Map<String, dynamic> json) {
@@ -104,8 +113,7 @@ class Measurement {
     final v = json[key];
     if (v is String) return v;
     if (v != null) return v.toString();
-    throw const FormatException(
-        'JSON inválido: falta un string requerido.');
+    throw const FormatException('JSON inválido: falta un string requerido.');
   }
 
   static double _requireDouble(Map<String, dynamic> json, String key) {

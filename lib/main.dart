@@ -28,16 +28,16 @@ class GridnoteApp extends StatelessWidget {
           theme: controller.theme.toThemeData(),
           routes: {
             '/': (_) => InitialLoadingScreen(
-              themeController: controller,
-              boot: _boot,
-              nextRoute: '/home',
-            ),
+                  themeController: controller,
+                  boot: _boot,
+                  nextRoute: '/home',
+                ),
             '/home': (_) => MeasurementScreen(
-              id: 'local-1',
-              meta: SheetMeta(id: '175507', name: 'Planilla 1'),
-              initial: _demoMeasurements(),
-              themeController: controller,
-            ),
+                  id: 'local-1',
+                  meta: SheetMeta(id: '175507', name: 'Planilla 1'),
+                  initial: _demoMeasurements(),
+                  themeController: controller,
+                ),
           },
         );
       },
@@ -50,25 +50,25 @@ Future<void> _boot() async {
 }
 
 List<Measurement> _demoMeasurements() => [
-  Measurement(
-    progresiva: 'A-01',
-    ohm1m: 1.2,
-    ohm3m: 3.4,
-    observations: 'OK',
-    date: DateTime.now().subtract(const Duration(days: 2)),
-  ),
-  Measurement(
-    progresiva: 'A-02',
-    ohm1m: 0.9,
-    ohm3m: 2.8,
-    observations: 'Vibración leve',
-    date: DateTime.now().subtract(const Duration(days: 1)),
-  ),
-  Measurement(
-    progresiva: 'A-03',
-    ohm1m: 1.5,
-    ohm3m: 3.1,
-    observations: '',
-    date: DateTime.now(),
-  ),
-];
+      Measurement(
+        progresiva: 'A-01',
+        ohm1m: 1.2,
+        ohm3m: 3.4,
+        observations: 'OK',
+        date: DateTime.now().subtract(const Duration(days: 2)),
+      ),
+      Measurement(
+        progresiva: 'A-02',
+        ohm1m: 0.9,
+        ohm3m: 2.8,
+        observations: 'Vibración leve',
+        date: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      Measurement(
+        progresiva: 'A-03',
+        ohm1m: 1.5,
+        ohm3m: 3.1,
+        observations: '',
+        date: DateTime.now(),
+      ),
+    ];

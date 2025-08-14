@@ -108,7 +108,9 @@ class OutboxItemAdapter extends TypeAdapter<OutboxItem> {
 
     w.writeByte(map.length);
     map.forEach((key, value) {
-      w..writeByte(key)..write(value);
+      w
+        ..writeByte(key)
+        ..write(value);
     });
   }
 }

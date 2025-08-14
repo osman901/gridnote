@@ -145,7 +145,8 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       debugPrint('Error al guardar la información: $e');
       if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: no se pudieron guardar los datos.')),
+          const SnackBar(
+              content: Text('Error: no se pudieron guardar los datos.')),
         );
       }
     } finally {
@@ -228,102 +229,97 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            if (_logoPath != null) ...[
-              AspectRatio(
-                aspectRatio: 6, // alto chico para logo horizontal
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Image.file(
-                    File(_logoPath!),
-                    height: 64,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            ElevatedButton.icon(
-              icon: const Icon(Icons.image),
-              label: const Text('Cambiar logo de la empresa'),
-              onPressed: disabled ? null : _elegirLogoEmpresa,
-            ),
-            const SizedBox(height: 20),
-
-            TextFormField(
-              controller: _nombreCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nombre de la empresa',
-                border: OutlineInputBorder(),
-              ),
-              enabled: !disabled,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _direccionCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Dirección',
-                border: OutlineInputBorder(),
-              ),
-              enabled: !disabled,
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Email de contacto',
-                border: OutlineInputBorder(),
-              ),
-              enabled: !disabled,
-              keyboardType: TextInputType.emailAddress,
-              validator: _emailValidator,
-            ),
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                const Text('Color institucional:'),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: disabled ? null : _pickColor,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: _color,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.black12),
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  if (_logoPath != null) ...[
+                    AspectRatio(
+                      aspectRatio: 6, // alto chico para logo horizontal
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Image.file(
+                          File(_logoPath!),
+                          height: 64,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
                     ),
-                    child: const SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Icon(Icons.edit, color: Colors.white),
-                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.image),
+                    label: const Text('Cambiar logo de la empresa'),
+                    onPressed: disabled ? null : _elegirLogoEmpresa,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _nombreCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la empresa',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: !disabled,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _direccionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Dirección',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: !disabled,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _emailCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Email de contacto',
+                      border: OutlineInputBorder(),
+                    ),
+                    enabled: !disabled,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: _emailValidator,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text('Color institucional:'),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: disabled ? null : _pickColor,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _color,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.black12),
+                          ),
+                          child: const SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Icon(Icons.edit, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: disabled
+                        ? null
+                        : () {
+                            if (!(_formKey.currentState?.validate() ?? false)) {
+                              return;
+                            }
+                            _guardarInfo();
+                          },
+                    icon: const Icon(Icons.save_rounded),
+                    label: const Text('Guardar datos'),
+                  ),
+                ],
+              ),
             ),
-
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: disabled
-                  ? null
-                  : () {
-                if (!(_formKey.currentState?.validate() ?? false)) {
-                  return;
-                }
-                _guardarInfo();
-              },
-              icon: const Icon(Icons.save_rounded),
-              label: const Text('Guardar datos'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

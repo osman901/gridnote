@@ -18,7 +18,7 @@ class ExportService {
       final xfile = XFile(
         tmp.path,
         mimeType:
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
 
       await Share.shareXFiles(
@@ -73,7 +73,8 @@ class ExportService {
     final dir = await getTemporaryDirectory();
 
     final base = sanitizeFileName(name);
-    final finalName = base.toLowerCase().endsWith('.xlsx') ? base : '$base.xlsx';
+    final finalName =
+        base.toLowerCase().endsWith('.xlsx') ? base : '$base.xlsx';
     final filePath = p.join(dir.path, finalName);
 
     final f = File(filePath);

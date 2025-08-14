@@ -28,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = const LinearGradient(
+    const bg = LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [Color(0xFF101820), Color(0xFF0F2B1F)],
@@ -36,14 +36,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(gradient: bg),
-        child: Center(
+        decoration: const BoxDecoration(gradient: bg),
+        child: const Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const ArrowLoader(size: 160),
-              const SizedBox(height: 18),
-              const _ShimmerText('Cargando Gridnote…'),
+              ArrowLoader(size: 160),
+              SizedBox(height: 18),
+              _ShimmerText('Cargando Gridnote…'),
             ],
           ),
         ),
@@ -62,8 +62,8 @@ class _ShimmerText extends StatefulWidget {
 
 class _ShimmerTextState extends State<_ShimmerText>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-  AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1600))
     ..repeat();
 
   @override
@@ -87,7 +87,8 @@ class _ShimmerTextState extends State<_ShimmerText>
           blendMode: BlendMode.srcIn,
           child: const Text(
             'Cargando Gridnote…',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           ),
         );
       },

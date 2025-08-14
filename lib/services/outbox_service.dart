@@ -30,29 +30,29 @@ class OutboxItem {
   DateTime? lastTryAt;
 
   Map<String, dynamic> toJson() => {
-    'kind': kind.name,
-    'path': path,
-    'filename': filename,
-    'to': to,
-    'subject': subject,
-    'text': text,
-    'attempts': attempts,
-    'lastTryAt': lastTryAt?.millisecondsSinceEpoch,
-  };
+        'kind': kind.name,
+        'path': path,
+        'filename': filename,
+        'to': to,
+        'subject': subject,
+        'text': text,
+        'attempts': attempts,
+        'lastTryAt': lastTryAt?.millisecondsSinceEpoch,
+      };
 
   static OutboxItem fromJson(Map data) => OutboxItem(
-    kind: (data['kind'] == 'pdf') ? OutboxKind.pdf : OutboxKind.excel,
-    path: (data['path'] as String?) ?? '',
-    filename: (data['filename'] as String?) ??
-        p.basename((data['path'] as String?) ?? 'file'),
-    to: data['to'] as String?,
-    subject: data['subject'] as String?,
-    text: data['text'] as String?,
-    attempts: (data['attempts'] as int?) ?? 0,
-    lastTryAt: (data['lastTryAt'] != null)
-        ? DateTime.fromMillisecondsSinceEpoch(data['lastTryAt'] as int)
-        : null,
-  );
+        kind: (data['kind'] == 'pdf') ? OutboxKind.pdf : OutboxKind.excel,
+        path: (data['path'] as String?) ?? '',
+        filename: (data['filename'] as String?) ??
+            p.basename((data['path'] as String?) ?? 'file'),
+        to: data['to'] as String?,
+        subject: data['subject'] as String?,
+        text: data['text'] as String?,
+        attempts: (data['attempts'] as int?) ?? 0,
+        lastTryAt: (data['lastTryAt'] != null)
+            ? DateTime.fromMillisecondsSinceEpoch(data['lastTryAt'] as int)
+            : null,
+      );
 }
 
 class OutboxService {
@@ -69,7 +69,8 @@ class OutboxService {
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   /// Abrir/crear la box y comenzar a observar conectividad
-  static Future<OutboxService> open({bool autoFlushOnConnectivity = true}) async {
+  static Future<OutboxService> open(
+      {bool autoFlushOnConnectivity = true}) async {
     final box = await Hive.openBox(_boxName);
     final svc = OutboxService(box);
     if (autoFlushOnConnectivity) {

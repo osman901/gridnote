@@ -11,8 +11,8 @@ class ArrowLoader extends StatefulWidget {
 
 class _ArrowLoaderState extends State<ArrowLoader>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-  AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1200))
     ..repeat();
 
   @override
@@ -67,7 +67,8 @@ class _ArrowLoaderState extends State<ArrowLoader>
                     transform: GradientRotation(angle),
                   ).createShader(r),
                   blendMode: BlendMode.srcIn,
-                  child: Icon(Icons.play_arrow_rounded, size: widget.size * 0.78),
+                  child:
+                      Icon(Icons.play_arrow_rounded, size: widget.size * 0.78),
                 ),
               ),
             ],
@@ -91,7 +92,7 @@ class _RingPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = sw
       ..shader = SweepGradient(
-        colors: [const Color(0xFF00E676), Colors.transparent],
+        colors: const [Color(0xFF00E676), Colors.transparent],
         stops: const [0.55, 1],
         transform: GradientRotation(progress * 2 * pi),
       ).createShader(rect);

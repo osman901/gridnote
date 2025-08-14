@@ -165,7 +165,8 @@ class _SheetScreenState extends State<SheetScreen> {
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
         _snack('Sin permisos de ubicación.');
         return;
       }
@@ -206,12 +207,14 @@ class _SheetScreenState extends State<SheetScreen> {
             children: [
               const ListTile(
                 title: Text('Ubicación guardada'),
-                subtitle: Text('Revisá o actualizá la ubicación de la planilla'),
+                subtitle:
+                    Text('Revisá o actualizá la ubicación de la planilla'),
               ),
               Row(
                 children: [
                   Expanded(
-                    child: Text('Lat: ${lat.toStringAsFixed(6)}\nLng: ${lng.toStringAsFixed(6)}'),
+                    child: Text(
+                        'Lat: ${lat.toStringAsFixed(6)}\nLng: ${lng.toStringAsFixed(6)}'),
                   ),
                   IconButton(
                     tooltip: 'Copiar',
@@ -269,12 +272,15 @@ class _SheetScreenState extends State<SheetScreen> {
     }
   }
 
-  String _mapsUrl(double lat, double lng) => 'https://www.google.com/maps?q=$lat,$lng';
+  String _mapsUrl(double lat, double lng) =>
+      'https://www.google.com/maps?q=$lat,$lng';
 
   //──────────────────────────────── XLSX / Share
   String _safeFileName(String name) {
     final cleaned = name.trim().isEmpty ? 'planilla' : name.trim();
-    return cleaned.replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '_').replaceAll(' ', '_');
+    return cleaned
+        .replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '_')
+        .replaceAll(' ', '_');
   }
 
   Future<List<int>> _buildXlsx(List<Measurement> data) async {
@@ -298,8 +304,8 @@ class _SheetScreenState extends State<SheetScreen> {
       sheet.getRangeByIndex(r, 1).setText(m.progresiva);
       final v1 = m.ohm1m;
       final v3 = m.ohm3m;
-      if (v1 != null) sheet.getRangeByIndex(r, 2).setNumber(v1);
-      if (v3 != null) sheet.getRangeByIndex(r, 3).setNumber(v3);
+      sheet.getRangeByIndex(r, 2).setNumber(v1);
+      sheet.getRangeByIndex(r, 3).setNumber(v3);
       sheet.getRangeByIndex(r, 4).setText(m.observations);
       sheet.getRangeByIndex(r, 5).setDateTime(m.date);
       sheet.getRangeByIndex(r, 5).numberFormat = 'dd/mm/yyyy';
@@ -310,7 +316,9 @@ class _SheetScreenState extends State<SheetScreen> {
         sheet.getRangeByIndex(r, 6).setNumber(rowLat);
         sheet.getRangeByIndex(r, 7).setNumber(rowLng);
         sheet.getRangeByIndex(r, 6, r, 7).numberFormat = '0.000000';
-        sheet.getRangeByIndex(r, 8).setFormula('HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")');
+        sheet
+            .getRangeByIndex(r, 8)
+            .setFormula('HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")');
       }
       r++;
     }
@@ -332,13 +340,18 @@ class _SheetScreenState extends State<SheetScreen> {
   Future<File> _writeTempXlsx(List<int> bytes) async {
     final dir = await getTemporaryDirectory();
     final base = _safeFileName(_title);
-    final ts = DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').replaceAll('-', '');
+    final ts = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '')
+        .replaceAll('.', '')
+        .replaceAll('-', '');
     final file = File('${dir.path}/gridnote_${base}_$ts.xlsx');
     await file.writeAsBytes(bytes, flush: true);
     return file;
   }
 
-  Future<void> _cleanupOldTempXlsx({Duration maxAge = const Duration(hours: 12)}) async {
+  Future<void> _cleanupOldTempXlsx(
+      {Duration maxAge = const Duration(hours: 12)}) async {
     try {
       final dir = await getTemporaryDirectory();
       final now = DateTime.now();
@@ -376,7 +389,8 @@ class _SheetScreenState extends State<SheetScreen> {
       b.writeln('Ubicación general:');
       b.writeln(_mapsUrl(lat, lng));
     }
-    final withCoords = rows.where((m) => m.latitude != null && m.longitude != null).toList();
+    final withCoords =
+        rows.where((m) => m.latitude != null && m.longitude != null).toList();
     if (withCoords.isNotEmpty) {
       b.writeln('');
       b.writeln('Enlaces por fila:');
@@ -387,7 +401,9 @@ class _SheetScreenState extends State<SheetScreen> {
         final prog = (m.progresiva.isEmpty) ? '-' : m.progresiva;
         b.writeln('• $prog → $url');
       }
-      if (withCoords.length > 10) b.writeln('• (+${withCoords.length - 10} más)');
+      if (withCoords.length > 10) {
+        b.writeln('• (+${withCoords.length - 10} más)');
+      }
     }
     return b.toString();
   }
@@ -425,25 +441,32 @@ class _SheetScreenState extends State<SheetScreen> {
         final mailto = Uri(
           scheme: 'mailto',
           path: trimmed,
-          queryParameters: <String, String>{'subject': 'Gridnote – $_title', 'body': bodyText},
+          queryParameters: <String, String>{
+            'subject': 'Gridnote – $_title',
+            'body': bodyText
+          },
         );
         try {
           if (await canLaunchUrl(mailto)) {
-            final ok = await launchUrl(mailto, mode: LaunchMode.externalApplication);
+            final ok =
+                await launchUrl(mailto, mode: LaunchMode.externalApplication);
             if (ok) return;
           }
         } catch (e2, st2) {
           _logError(e2, st2);
         }
         await Share.shareXFiles(
-          [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+          [
+            XFile(file.path,
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+          ],
           subject: 'Gridnote – $_title',
           text: bodyText,
         );
       }
 
       // No borrar aquí. Limpieza diferida: _cleanupOldTempXlsx().
-
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
@@ -480,7 +503,8 @@ class _SheetScreenState extends State<SheetScreen> {
                       children: [
                         const ListTile(
                           title: Text('Enviar por correo'),
-                          subtitle: Text('Podés guardar el email como frecuente'),
+                          subtitle:
+                              Text('Podés guardar el email como frecuente'),
                         ),
                         TextField(
                           controller: ctl,
@@ -496,7 +520,8 @@ class _SheetScreenState extends State<SheetScreen> {
                         const SizedBox(height: 4),
                         CheckboxListTile(
                           value: saveAsDefault,
-                          onChanged: (v) => setSB(() => saveAsDefault = v ?? false),
+                          onChanged: (v) =>
+                              setSB(() => saveAsDefault = v ?? false),
                           controlAffinity: ListTileControlAffinity.leading,
                           title: const Text('Guardar como frecuente'),
                           contentPadding: EdgeInsets.zero,
@@ -537,23 +562,23 @@ class _SheetScreenState extends State<SheetScreen> {
 
   //──────────────────────────────── Estilos y header
   ButtonStyle _chipStyle(Color surface) => OutlinedButton.styleFrom(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    visualDensity: VisualDensity.compact,
-    shape: const StadiumBorder(),
-    backgroundColor: surface,
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        visualDensity: VisualDensity.compact,
+        shape: const StadiumBorder(),
+        backgroundColor: surface,
+      );
 
   Widget _shareMenuButton({required bool compact}) {
     final Widget child = compact
         ? const Icon(Icons.ios_share_outlined)
-        : Row(
-      mainAxisSize: MainAxisSize.min,
-      children: const [
-        Icon(Icons.ios_share_outlined),
-        SizedBox(width: 8),
-        Text('Compartir'),
-      ],
-    );
+        : const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.ios_share_outlined),
+              SizedBox(width: 8),
+              Text('Compartir'),
+            ],
+          );
 
     final Widget button = IgnorePointer(
       ignoring: true,
@@ -602,31 +627,35 @@ class _SheetScreenState extends State<SheetScreen> {
       style: _chipStyle(t.surface),
       onPressed: _isBusy ? null : (hasLoc ? _showLocationSheet : _saveLocation),
       icon: _isBusy
-          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2))
           : Icon(hasLoc ? Icons.check_circle : Icons.place_outlined),
       label: Text(hasLoc ? 'Ubicación guardada' : 'Guardar ubicación'),
     );
 
     final titleWidget = _editingTitle
         ? TextField(
-      controller: _titleCtrl,
-      autofocus: true,
-      textInputAction: TextInputAction.done,
-      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-      decoration: const InputDecoration(isCollapsed: true, border: InputBorder.none),
-      onSubmitted: (_) => _saveTitle(),
-      onTapOutside: (_) => _saveTitle(),
-    )
+            controller: _titleCtrl,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            decoration: const InputDecoration(
+                isCollapsed: true, border: InputBorder.none),
+            onSubmitted: (_) => _saveTitle(),
+            onTapOutside: (_) => _saveTitle(),
+          )
         : GestureDetector(
-      onTap: () => setState(() => _editingTitle = true),
-      child: Text(
-        _title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        softWrap: false,
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-      ),
-    );
+            onTap: () => setState(() => _editingTitle = true),
+            child: Text(
+              _title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+          );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -681,7 +710,8 @@ class _SheetScreenState extends State<SheetScreen> {
 
   void _ensureLocalIds() {
     // Asigna IDs locales a los que no tienen.
-    _currentMeasurements = _currentMeasurements.map(_withLocalId).toList(growable: true);
+    _currentMeasurements =
+        _currentMeasurements.map(_withLocalId).toList(growable: true);
   }
 
   int _indexOfById(Measurement m) {
@@ -693,7 +723,7 @@ class _SheetScreenState extends State<SheetScreen> {
   // Fallback por si llega un objeto sin id
   int _indexOfByFields(Measurement m) {
     return _currentMeasurements.indexWhere((e) =>
-    e.progresiva == m.progresiva &&
+        e.progresiva == m.progresiva &&
         e.date == m.date &&
         (e.latitude ?? 0.0) == (m.latitude ?? 0.0) &&
         (e.longitude ?? 0.0) == (m.longitude ?? 0.0));
@@ -726,7 +756,8 @@ class _SheetScreenState extends State<SheetScreen> {
       if (i >= 0) {
         _currentMeasurements = List.of(_currentMeasurements)..removeAt(i);
       } else {
-        _currentMeasurements = _currentMeasurements.where((e) => e != m).toList();
+        _currentMeasurements =
+            _currentMeasurements.where((e) => e != m).toList();
       }
     });
   }
@@ -751,12 +782,13 @@ class _SheetScreenState extends State<SheetScreen> {
           resizeToAvoidBottomInset: false,
           backgroundColor: t.scaffold,
           appBar: AppBar(
-            title: Text('Planilla: ${widget.meta.id}', overflow: TextOverflow.ellipsis),
+            title: Text('Planilla: ${widget.meta.id}',
+                overflow: TextOverflow.ellipsis),
             bottom: _isBusy
                 ? const PreferredSize(
-              preferredSize: Size.fromHeight(2),
-              child: LinearProgressIndicator(minHeight: 2),
-            )
+                    preferredSize: Size.fromHeight(2),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  )
                 : null,
           ),
           body: GestureDetector(

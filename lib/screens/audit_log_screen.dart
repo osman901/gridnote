@@ -29,7 +29,9 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     final events = _events.where((e) {
       if (_query.trim().isEmpty) return true;
       final q = _query.toLowerCase();
-      return '${e.action} ${e.field} ${e.key} ${e.newValue} ${e.oldValue}'.toLowerCase().contains(q);
+      return '${e.action} ${e.field} ${e.key} ${e.newValue} ${e.oldValue}'
+          .toLowerCase()
+          .contains(q);
     }).toList();
 
     return Scaffold(
@@ -41,16 +43,20 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
             tooltip: 'Vaciar historial',
             onPressed: () async {
               final ok = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Vaciar historial'),
-                  content: const Text('Esto eliminará audit.log'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-                    FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Vaciar')),
-                  ],
-                ),
-              ) ??
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Vaciar historial'),
+                      content: const Text('Esto eliminará audit.log'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancelar')),
+                        FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Vaciar')),
+                      ],
+                    ),
+                  ) ??
                   false;
               if (!ok) return;
               await AuditService.clear();

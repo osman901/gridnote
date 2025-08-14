@@ -22,10 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _settings = SettingsService.instance;
     // (Opcional) Reacciona a cambios externos si SettingsService extiende ChangeNotifier
-    if (_settings is ChangeNotifier) {
-      (_settings as ChangeNotifier).addListener(_onServiceChanged);
-    }
-    _load();
+    (_settings as ChangeNotifier).addListener(_onServiceChanged);
+      _load();
   }
 
   void _onServiceChanged() {
@@ -47,10 +45,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    if (_settings is ChangeNotifier) {
-      (_settings as ChangeNotifier).removeListener(_onServiceChanged);
-    }
-    _endpointCtl.dispose();
+    (_settings as ChangeNotifier).removeListener(_onServiceChanged);
+      _endpointCtl.dispose();
     _emailCtl.dispose();
     super.dispose();
   }
@@ -173,8 +169,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
                 '• Si hay endpoint, los Excel se envían por HTTP.\n'
-                    '• Si no hay endpoint y hay email, se abre el envío por correo.\n'
-                    '• Ambos campos son opcionales; usa el que prefieras.',
+                '• Si no hay endpoint y hay email, se abre el envío por correo.\n'
+                '• Ambos campos son opcionales; usa el que prefieras.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ),
