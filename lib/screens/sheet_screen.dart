@@ -1,20 +1,25 @@
 // lib/screens/sheet_screen.dart
-import 'dart:io';
+import 'dart:ui' show ImageFilter, FontFeature;
 
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // HapticFeedback, Clipboard
-import 'package:flutter_email_sender/flutter_email_sender.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
-import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 
 import '../models/measurement.dart';
 import '../models/sheet_meta.dart';
+import '../services/audit_log_service.dart';
+import '../services/suggest_service.dart';
+import '../services/validation_rules.dart';       // defaultRules()
+import '../services/smart_assistant.dart';        // GridnoteAssistant
 import '../theme/gridnote_theme.dart';
-import '../widgets/measurement_datagrid.dart';
+import '../viewmodels/sheet_view_model.dart';
+import '../widgets/measurement_pluto_grid.dart';
+import '../widgets/value_listenable_builder_2.dart';
+import '../widgets/form_view.dart';
+import '../widgets/chart_dialog.dart';
+import '../services/elite_assistant.dart';
+import '../services/service_locator.dart';
 
 class SheetScreen extends StatefulWidget {
   const SheetScreen({
@@ -37,443 +42,214 @@ class SheetScreen extends StatefulWidget {
 }
 
 class _SheetScreenState extends State<SheetScreen> {
-  static const _kDefaultEmailKey = 'default_email';
-
-  bool _editingTitle = false;
   late final TextEditingController _titleCtrl;
+  late final TextEditingController _searchCtrl;
 
-  final Future<SharedPreferences> _sp = SharedPreferences.getInstance();
-  String? _defaultEmail;
-
-  double? _lat;
-  double? _lng;
-
-  late List<Measurement> _currentMeasurements;
-  late String _title;
-
-  bool _isBusy = false;
-
-  // IDs locales negativos
-  int _nextTempId = -1;
-
+  late final SheetViewModel _vm;
   final _gridCtrl = MeasurementGridController();
+
+  bool get _isIOS => defaultTargetPlatform == TargetPlatform.iOS;
+
+  GridnoteAssistant? _assistant;
 
   @override
   void initState() {
     super.initState();
-    _title = widget.meta.name;
-    _titleCtrl = TextEditingController(text: _title);
-    _currentMeasurements = List<Measurement>.from(widget.initial);
-    _ensureLocalIds();
-    _loadDefaultEmail();
-    _loadSavedLocation();
-    _cleanupOldTempXlsx(); // limpieza silenciosa de temporales viejos
+    _titleCtrl = TextEditingController(text: widget.meta.name);
+    _searchCtrl = TextEditingController();
+
+    _vm = SheetViewModel(
+      sheetId: widget.id,
+      initialTitle: widget.meta.name,
+      initialRows: widget.initial,
+      audit: getIt<AuditLogService>(param1: widget.meta.id),
+      onSnack: _snack,
+      onTitleChanged: (v) => widget.onTitleChanged?.call(v),
+    );
+
+    _vm.init();
+
+    EliteAssistant.forSheet(widget.meta.id).then((a) {
+      if (!mounted) return;
+      setState(() => _assistant = a);
+    });
   }
 
   @override
   void didUpdateWidget(covariant SheetScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initial != oldWidget.initial) {
-      _currentMeasurements = List<Measurement>.from(widget.initial);
-      _ensureLocalIds();
-      // setState() no es necesario aquí: build se ejecuta tras didUpdateWidget.
-    }
     if (widget.meta.name != oldWidget.meta.name) {
-      setState(() {
-        _title = widget.meta.name;
-        _titleCtrl.text = _title;
-      });
+      _titleCtrl.text = widget.meta.name;
     }
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _searchCtrl.dispose();
+    _vm.dispose();
     super.dispose();
   }
 
-  //──────────────────────────────── Helpers generales
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _logError(Object e, [StackTrace? st]) {
-    debugPrint('SheetScreen error: $e');
-    if (st != null) debugPrint(st.toString());
-  }
-
-  //──────────────────────────────── Prefs email
-  Future<void> _loadDefaultEmail() async {
-    final sp = await _sp;
-    if (!mounted) return;
-    setState(() => _defaultEmail = sp.getString(_kDefaultEmailKey));
-  }
-
-  Future<void> _saveDefaultEmail(String? email) async {
-    final sp = await _sp;
-    if (email == null || email.trim().isEmpty) {
-      await sp.remove(_kDefaultEmailKey);
-      if (!mounted) return;
-      setState(() => _defaultEmail = null);
-    } else {
-      final v = email.trim();
-      await sp.setString(_kDefaultEmailKey, v);
-      if (!mounted) return;
-      setState(() => _defaultEmail = v);
-    }
-  }
-
-  //──────────────────────────────── Título
-  Future<void> _saveTitle() async {
-    final v = _titleCtrl.text.trim();
-    var changed = false;
-    if (v.isNotEmpty && v != _title) {
-      widget.onTitleChanged?.call(v);
-      setState(() => _title = v);
-      changed = true;
-    }
-    if (!mounted) return;
-    setState(() => _editingTitle = false);
-    HapticFeedback.selectionClick();
-    if (changed) _snack('Título guardado.');
-  }
-
-  //──────────────────────────────── Ubicación
-  String get _latKey => 'sheet_${widget.meta.id}_lat';
-  String get _lngKey => 'sheet_${widget.meta.id}_lng';
-
-  Future<void> _loadSavedLocation() async {
-    final sp = await _sp;
-    if (!mounted) return;
-    setState(() {
-      _lat = sp.getDouble(_latKey);
-      _lng = sp.getDouble(_lngKey);
-    });
-  }
-
-  Future<void> _saveLocation() async {
-    if (_isBusy) return;
-    setState(() => _isBusy = true);
-    try {
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) {
-        _snack('Activá el GPS para guardar la ubicación.');
-        return;
-      }
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        _snack('Sin permisos de ubicación.');
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+  // === Share menu ===
+  Widget _shareMenuButton() {
+    if (_isIOS) {
+      return ValueListenableBuilder<bool>(
+        valueListenable: _vm.isBusy,
+        builder: (_, busy, __) {
+          return CupertinoButton.filled(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            onPressed: busy ? null : _showShareSheetIOS,
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [Icon(CupertinoIcons.share), SizedBox(width: 6), Text('Exportar')],
+            ),
+          );
+        },
       );
-      final sp = await _sp;
-      await sp.setDouble(_latKey, pos.latitude);
-      await sp.setDouble(_lngKey, pos.longitude);
-      if (!mounted) return;
-      setState(() {
-        _lat = pos.latitude;
-        _lng = pos.longitude;
-      });
-      _snack('Ubicación guardada.');
-    } catch (e, st) {
-      _logError(e, st);
-      _snack('No se pudo obtener la ubicación.');
-    } finally {
-      if (mounted) setState(() => _isBusy = false);
     }
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: _vm.isBusy,
+      builder: (_, busy, __) {
+        const child = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Icon(Icons.ios_share_outlined), SizedBox(width: 8), Text('Exportar')],
+        );
+        final button = IgnorePointer(
+          ignoring: true,
+          child: FilledButton.tonal(onPressed: () {}, child: child),
+        );
+        return PopupMenuButton<String>(
+          tooltip: 'Compartir / Exportar',
+          enabled: !busy,
+          onSelected: (v) async {
+            final visibleRows = _gridCtrl.snapshot();
+            switch (v) {
+              case 'send_visible_xlsx':
+                final email = await _askForEmail();
+                if (email != null) await _vm.shareViaEmailXlsx(rows: visibleRows, email: email);
+                break;
+              case 'send_all_xlsx':
+                final email2 = await _askForEmail();
+                if (email2 != null) await _vm.shareViaEmailXlsx(rows: _vm.measurements.value, email: email2);
+                break;
+              case 'export_visible_csv':
+                await _vm.shareCsv(rows: visibleRows);
+                break;
+              case 'export_all_csv':
+                await _vm.shareCsv(rows: _vm.measurements.value);
+                break;
+              case 'export_pdf_visible':
+                await _vm.exportPdf(rows: visibleRows);
+                break;
+              case 'export_pdf_all':
+                await _vm.exportPdf(rows: _vm.measurements.value);
+                break;
+            }
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: 'send_visible_xlsx',
+              child: ListTile(leading: Icon(Icons.filter_alt_outlined), title: Text('Enviar XLSX (solo visible)')),
+            ),
+            PopupMenuItem(
+              value: 'send_all_xlsx',
+              child: ListTile(leading: Icon(Icons.grid_on_outlined), title: Text('Enviar XLSX (todas las filas)')),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'export_visible_csv',
+              child: ListTile(leading: Icon(Icons.table_chart_outlined), title: Text('Exportar CSV (solo visible)')),
+            ),
+            PopupMenuItem(
+              value: 'export_all_csv',
+              child: ListTile(leading: Icon(Icons.table_rows_outlined), title: Text('Exportar CSV (todas las filas)')),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'export_pdf_visible',
+              child: ListTile(leading: Icon(Icons.picture_as_pdf_outlined), title: Text('Exportar PDF (solo visible)')),
+            ),
+            PopupMenuItem(
+              value: 'export_pdf_all',
+              child: ListTile(leading: Icon(Icons.picture_as_pdf), title: Text('Exportar PDF (todas las filas)')),
+            ),
+          ],
+          child: button,
+        );
+      },
+    );
   }
 
-  Future<void> _showLocationSheet() async {
-    final lat = _lat, lng = _lng;
-    if (lat == null || lng == null) {
-      await _saveLocation();
-      return;
-    }
-    await showModalBottomSheet<void>(
+  Future<void> _showShareSheetIOS() async {
+    await showCupertinoModalPopup<void>(
       context: context,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(
-                title: Text('Ubicación guardada'),
-                subtitle:
-                    Text('Revisá o actualizá la ubicación de la planilla'),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                        'Lat: ${lat.toStringAsFixed(6)}\nLng: ${lng.toStringAsFixed(6)}'),
-                  ),
-                  IconButton(
-                    tooltip: 'Copiar',
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: '$lat,$lng'));
-                      Navigator.pop(ctx);
-                      _snack('Coordenadas copiadas');
-                    },
-                    icon: const Icon(Icons.copy_all_outlined),
-                  )
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _openMapsFor(lat: lat, lng: lng);
-                    },
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Ver en mapa'),
-                  ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      await _saveLocation();
-                    },
-                    icon: const Icon(Icons.my_location_outlined),
-                    label: const Text('Actualizar ubicación'),
-                  ),
-                ],
-              ),
-            ],
+      builder: (_) => CupertinoActionSheet(
+        title: const Text('Exportar / Compartir'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              final email = await _askForEmail();
+              if (email != null) await _vm.shareViaEmailXlsx(rows: _gridCtrl.snapshot(), email: email);
+            },
+            child: const Text('Enviar XLSX (solo visible)'),
           ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              final email = await _askForEmail();
+              if (email != null) await _vm.shareViaEmailXlsx(rows: _vm.measurements.value, email: email);
+            },
+            child: const Text('Enviar XLSX (todas)'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _vm.shareCsv(rows: _gridCtrl.snapshot());
+            },
+            child: const Text('Exportar CSV (solo visible)'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _vm.shareCsv(rows: _vm.measurements.value);
+            },
+            child: const Text('Exportar CSV (todas)'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _vm.exportPdf(rows: _gridCtrl.snapshot());
+            },
+            child: const Text('Exportar PDF (solo visible)'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _vm.exportPdf(rows: _vm.measurements.value);
+            },
+            child: const Text('Exportar PDF (todas)'),
+          ),
+        ],
+        // ✅ onPressed no nulo y sin const para evitar error de tipo
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          isDefaultAction: true,
+          child: const Text('Cancelar'),
         ),
       ),
     );
   }
 
-  Future<void> _openMapsFor({double? lat, double? lng}) async {
-    if (lat == null || lng == null) return;
-    final uri = Uri.parse(_mapsUrl(lat, lng));
-    try {
-      if (await canLaunchUrl(uri)) {
-        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!ok) _snack('No se pudo abrir la app de mapas.');
-      } else {
-        _snack('No se pudo abrir la app de mapas.');
-      }
-    } catch (e, st) {
-      _logError(e, st);
-      _snack('No se pudo abrir la app de mapas.');
-    }
-  }
-
-  String _mapsUrl(double lat, double lng) =>
-      'https://www.google.com/maps?q=$lat,$lng';
-
-  //──────────────────────────────── XLSX / Share
-  String _safeFileName(String name) {
-    final cleaned = name.trim().isEmpty ? 'planilla' : name.trim();
-    return cleaned
-        .replaceAll(RegExp(r'[^a-zA-Z0-9 _-]'), '_')
-        .replaceAll(' ', '_');
-  }
-
-  Future<List<int>> _buildXlsx(List<Measurement> data) async {
-    final book = xlsio.Workbook();
-    final sheet = book.worksheets[0];
-    sheet.name = 'Datos';
-
-    sheet.getRangeByIndex(1, 1).setText('Progresiva');
-    sheet.getRangeByIndex(1, 2).setText('1 m Ω');
-    sheet.getRangeByIndex(1, 3).setText('3 m Ω');
-    sheet.getRangeByIndex(1, 4).setText('Obs');
-    sheet.getRangeByIndex(1, 5).setText('Fecha');
-    sheet.getRangeByIndex(1, 6).setText('Latitud');
-    sheet.getRangeByIndex(1, 7).setText('Longitud');
-    sheet.getRangeByIndex(1, 8).setText('Maps');
-    sheet.getRangeByIndex(1, 1, 1, 8).cellStyle.bold = true;
-
-    final gLat = _lat, gLng = _lng;
-    var r = 2;
-    for (final m in data) {
-      sheet.getRangeByIndex(r, 1).setText(m.progresiva);
-      final v1 = m.ohm1m;
-      final v3 = m.ohm3m;
-      sheet.getRangeByIndex(r, 2).setNumber(v1);
-      sheet.getRangeByIndex(r, 3).setNumber(v3);
-      sheet.getRangeByIndex(r, 4).setText(m.observations);
-      sheet.getRangeByIndex(r, 5).setDateTime(m.date);
-      sheet.getRangeByIndex(r, 5).numberFormat = 'dd/mm/yyyy';
-
-      final rowLat = m.latitude ?? gLat;
-      final rowLng = m.longitude ?? gLng;
-      if (rowLat != null && rowLng != null) {
-        sheet.getRangeByIndex(r, 6).setNumber(rowLat);
-        sheet.getRangeByIndex(r, 7).setNumber(rowLng);
-        sheet.getRangeByIndex(r, 6, r, 7).numberFormat = '0.000000';
-        sheet
-            .getRangeByIndex(r, 8)
-            .setFormula('HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")');
-      }
-      r++;
-    }
-
-    sheet.getRangeByIndex(1, 4, r - 1, 4).cellStyle.wrapText = true;
-
-    for (var c = 1; c <= 8; c++) {
-      sheet.autoFitColumn(c);
-    }
-    for (var i = 1; i < r; i++) {
-      sheet.autoFitRow(i);
-    }
-
-    final bytes = book.saveAsStream();
-    book.dispose();
-    return bytes;
-  }
-
-  Future<File> _writeTempXlsx(List<int> bytes) async {
-    final dir = await getTemporaryDirectory();
-    final base = _safeFileName(_title);
-    final ts = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '')
-        .replaceAll('.', '')
-        .replaceAll('-', '');
-    final file = File('${dir.path}/gridnote_${base}_$ts.xlsx');
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
-  }
-
-  Future<void> _cleanupOldTempXlsx(
-      {Duration maxAge = const Duration(hours: 12)}) async {
-    try {
-      final dir = await getTemporaryDirectory();
-      final now = DateTime.now();
-      final entities = await dir.list().toList();
-      for (final e in entities) {
-        if (e is! File) continue;
-        final p = e.path;
-        if (!p.endsWith('.xlsx') || !p.contains('gridnote_')) continue;
-        final stat = await e.stat();
-        if (now.difference(stat.modified) > maxAge) {
-          try {
-            await e.delete();
-          } catch (err, st) {
-            _logError(err, st);
-          }
-        }
-      }
-    } catch (e, st) {
-      _logError(e, st);
-    }
-  }
-
-  bool _isEmailValid(String e) {
-    final s = e.trim();
-    final re = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
-    return re.hasMatch(s);
-  }
-
-  String _buildEmailBody(List<Measurement> rows) {
-    final b = StringBuffer();
-    b.writeln('Adjunto XLSX generado con Gridnote para "$_title".');
-    final lat = _lat, lng = _lng;
-    if (lat != null && lng != null) {
-      b.writeln('');
-      b.writeln('Ubicación general:');
-      b.writeln(_mapsUrl(lat, lng));
-    }
-    final withCoords =
-        rows.where((m) => m.latitude != null && m.longitude != null).toList();
-    if (withCoords.isNotEmpty) {
-      b.writeln('');
-      b.writeln('Enlaces por fila:');
-      for (final m in withCoords.take(10)) {
-        final ml = m.latitude!;
-        final mg = m.longitude!;
-        final url = _mapsUrl(ml, mg);
-        final prog = (m.progresiva.isEmpty) ? '-' : m.progresiva;
-        b.writeln('• $prog → $url');
-      }
-      if (withCoords.length > 10) {
-        b.writeln('• (+${withCoords.length - 10} más)');
-      }
-    }
-    return b.toString();
-  }
-
-  Future<void> _shareViaEmail({required List<Measurement> rows}) async {
-    if (_isBusy) return;
-    setState(() => _isBusy = true);
-    try {
-      final email = await _askForEmail(initial: _defaultEmail);
-      if (email == null) return;
-
-      final trimmed = email.trim();
-      if (!_isEmailValid(trimmed)) {
-        _snack('Email inválido. Revisá el destinatario.');
-        return;
-      }
-
-      final bytes = await _buildXlsx(rows);
-      final file = await _writeTempXlsx(bytes);
-      final bodyText = _buildEmailBody(rows);
-
-      final mail = Email(
-        recipients: [trimmed],
-        subject: 'Gridnote – $_title',
-        body: bodyText,
-        attachmentPaths: [file.path],
-        isHTML: false,
-      );
-
-      try {
-        await FlutterEmailSender.send(mail);
-        _snack('Se abrió tu app de correo. Tocá “Enviar”.');
-      } catch (e, st) {
-        _logError(e, st);
-        final mailto = Uri(
-          scheme: 'mailto',
-          path: trimmed,
-          queryParameters: <String, String>{
-            'subject': 'Gridnote – $_title',
-            'body': bodyText
-          },
-        );
-        try {
-          if (await canLaunchUrl(mailto)) {
-            final ok =
-                await launchUrl(mailto, mode: LaunchMode.externalApplication);
-            if (ok) return;
-          }
-        } catch (e2, st2) {
-          _logError(e2, st2);
-        }
-        await Share.shareXFiles(
-          [
-            XFile(file.path,
-                mimeType:
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-          ],
-          subject: 'Gridnote – $_title',
-          text: bodyText,
-        );
-      }
-
-      // No borrar aquí. Limpieza diferida: _cleanupOldTempXlsx().
-    } finally {
-      if (mounted) setState(() => _isBusy = false);
-    }
-  }
-
-  Future<String?> _askForEmail({String? initial}) async {
-    final ctl = TextEditingController(text: initial ?? '');
+  Future<String?> _askForEmail() async {
+    final ctl = TextEditingController(text: _vm.defaultEmail.value ?? '');
     bool saveAsDefault = false;
 
     final result = await showModalBottomSheet<String>(
@@ -483,7 +259,7 @@ class _SheetScreenState extends State<SheetScreen> {
       builder: (ctx) {
         void submit() {
           final v = ctl.text.trim();
-          if (saveAsDefault && v.isNotEmpty) _saveDefaultEmail(v);
+          if (saveAsDefault && v.isNotEmpty) _vm.saveDefaultEmail(v);
           Navigator.pop(ctx, v.isEmpty ? null : v);
         }
 
@@ -503,8 +279,7 @@ class _SheetScreenState extends State<SheetScreen> {
                       children: [
                         const ListTile(
                           title: Text('Enviar por correo'),
-                          subtitle:
-                              Text('Podés guardar el email como frecuente'),
+                          subtitle: Text('Podés guardar el email como frecuente'),
                         ),
                         TextField(
                           controller: ctl,
@@ -520,8 +295,7 @@ class _SheetScreenState extends State<SheetScreen> {
                         const SizedBox(height: 4),
                         CheckboxListTile(
                           value: saveAsDefault,
-                          onChanged: (v) =>
-                              setSB(() => saveAsDefault = v ?? false),
+                          onChanged: (v) => setSB(() => saveAsDefault = v ?? false),
                           controlAffinity: ListTileControlAffinity.leading,
                           title: const Text('Guardar como frecuente'),
                           contentPadding: EdgeInsets.zero,
@@ -535,7 +309,7 @@ class _SheetScreenState extends State<SheetScreen> {
                             OutlinedButton.icon(
                               onPressed: () {
                                 Navigator.pop(ctx, null);
-                                _saveDefaultEmail(null);
+                                _vm.saveDefaultEmail(null);
                               },
                               icon: const Icon(Icons.delete_outline),
                               label: const Text('Borrar guardado'),
@@ -560,102 +334,265 @@ class _SheetScreenState extends State<SheetScreen> {
     return result;
   }
 
-  //──────────────────────────────── Estilos y header
   ButtonStyle _chipStyle(Color surface) => OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        visualDensity: VisualDensity.compact,
-        shape: const StadiumBorder(),
-        backgroundColor: surface,
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    visualDensity: VisualDensity.compact,
+    shape: const StadiumBorder(),
+    backgroundColor: surface,
+  );
 
-  Widget _shareMenuButton({required bool compact}) {
-    final Widget child = compact
-        ? const Icon(Icons.ios_share_outlined)
-        : const Row(
+  Widget _iosViewSegment() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _vm.formView,
+      builder: (_, isForm, __) {
+        return CupertinoSlidingSegmentedControl<int>(
+          groupValue: isForm ? 1 : 0,
+          children: const {
+            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Tabla')),
+            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Formulario')),
+          },
+          onValueChanged: (v) => _vm.formView.value = (v ?? 0) == 1,
+        );
+      },
+    );
+  }
+
+  Future<void> _showLocationSheet() async {
+    final la = _vm.lat.value, lo = _vm.lng.value;
+    if (la == null || lo == null) {
+      await _vm.saveLocation();
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.ios_share_outlined),
-              SizedBox(width: 8),
-              Text('Compartir'),
+              const ListTile(
+                title: Text('Ubicación guardada'),
+                subtitle: Text('Revisá o actualizá la ubicación de la planilla'),
+              ),
+              Row(
+                children: [
+                  Expanded(child: Text('Lat: ${la.toStringAsFixed(6)}\nLng: ${lo.toStringAsFixed(6)}')),
+                  IconButton(
+                    tooltip: 'Copiar',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: '$la,$lo'));
+                      HapticFeedback.selectionClick();
+                      Navigator.pop(ctx);
+                      _snack('Coordenadas copiadas');
+                    },
+                    icon: const Icon(Icons.copy_all_outlined),
+                  )
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _vm.openMapsFor(latParam: la, lngParam: lo);
+                    },
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Ver en mapa'),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _vm.saveLocation();
+                    },
+                    icon: const Icon(Icons.my_location_outlined),
+                    label: const Text('Actualizar ubicación'),
+                  ),
+                ],
+              ),
             ],
-          );
-
-    final Widget button = IgnorePointer(
-      ignoring: true,
-      child: compact
-          ? IconButton.filledTonal(onPressed: () {}, icon: child)
-          : FilledButton.tonal(onPressed: () {}, child: child),
-    );
-
-    return PopupMenuButton<String>(
-      tooltip: 'Compartir / Exportar',
-      enabled: !_isBusy,
-      onSelected: (v) async {
-        switch (v) {
-          case 'send_visible':
-            await _shareViaEmail(rows: _gridCtrl.snapshot());
-            break;
-          case 'send_all':
-            await _shareViaEmail(rows: _currentMeasurements);
-            break;
-        }
-      },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: 'send_visible',
-          child: ListTile(
-            leading: Icon(Icons.filter_alt_outlined),
-            title: Text('Enviar XLSX (solo visible)'),
           ),
         ),
-        PopupMenuItem(
-          value: 'send_all',
-          child: ListTile(
-            leading: Icon(Icons.grid_on_outlined),
-            title: Text('Enviar XLSX (todas las filas)'),
+      ),
+    );
+  }
+
+  Widget _toolsBar(GridnoteTheme t) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ValueListenableBuilder<bool>(
+          valueListenable: _vm.isBusy,
+          builder: (_, busy, __) {
+            return OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () async {
+                final src = await showModalBottomSheet<String>(
+                  context: context,
+                  showDragHandle: true,
+                  builder: (ctx) => SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const ListTile(title: Text('Importar tabla por OCR')),
+                        ListTile(
+                          leading: const Icon(Icons.photo_camera_outlined),
+                          title: const Text('Usar cámara'),
+                          onTap: () => Navigator.pop(ctx, 'camera'),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.photo_library_outlined),
+                          title: const Text('Elegir de galería'),
+                          onTap: () => Navigator.pop(ctx, 'gallery'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+                if (src == null) return;
+                if (src == 'camera') {
+                  await _vm.importOcrFromCamera();
+                } else {
+                  await _vm.importOcrFromGallery();
+                }
+              },
+              icon: const Icon(Icons.document_scanner_outlined),
+              label: const Text('Importar (OCR)'),
+            );
+          },
+        ),
+        OutlinedButton.icon(
+          onPressed: () => showChartDialog(context, _gridCtrl.snapshot()),
+          icon: const Icon(Icons.show_chart_outlined),
+          label: const Text('Gráfico'),
+        ),
+        if (_assistant != null)
+          const Chip(
+            label: Text('IA lista'),
+            avatar: Icon(Icons.auto_awesome),
+            visualDensity: VisualDensity.compact,
           ),
+        _isIOS
+            ? _iosViewSegment()
+            : ValueListenableBuilder<bool>(
+          valueListenable: _vm.formView,
+          builder: (_, isForm, __) {
+            return FilterChip(
+              label: const Text('Vista formulario'),
+              selected: isForm,
+              onSelected: (v) => _vm.formView.value = v,
+            );
+          },
         ),
       ],
-      child: button,
     );
   }
 
   Widget _buildHeader(GridnoteTheme t, GridnoteTableStyle table) {
-    final hasLoc = _lat != null && _lng != null;
-
-    final locBtn = OutlinedButton.icon(
-      style: _chipStyle(t.surface),
-      onPressed: _isBusy ? null : (hasLoc ? _showLocationSheet : _saveLocation),
-      icon: _isBusy
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2))
-          : Icon(hasLoc ? Icons.check_circle : Icons.place_outlined),
-      label: Text(hasLoc ? 'Ubicación guardada' : 'Guardar ubicación'),
+    final titleWidget = ValueListenableBuilder<String>(
+      valueListenable: _vm.title,
+      builder: (_, title, __) {
+        return GestureDetector(
+          onTap: () async {
+            _titleCtrl.text = title;
+            final txt = await showDialog<String>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Editar título'),
+                content: TextField(
+                  controller: _titleCtrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(hintText: 'Nuevo título'),
+                  onSubmitted: (_) => Navigator.pop(ctx, _titleCtrl.text.trim()),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, _titleCtrl.text.trim()), child: const Text('Guardar')),
+                ],
+              ),
+            );
+            if (txt != null) await _vm.saveTitle(txt);
+          },
+          child: Text(
+            title.isEmpty ? ' ' : title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          ),
+        );
+      },
     );
 
-    final titleWidget = _editingTitle
-        ? TextField(
-            controller: _titleCtrl,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-            decoration: const InputDecoration(
-                isCollapsed: true, border: InputBorder.none),
-            onSubmitted: (_) => _saveTitle(),
-            onTapOutside: (_) => _saveTitle(),
-          )
-        : GestureDetector(
-            onTap: () => setState(() => _editingTitle = true),
-            child: Text(
-              _title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+    final search = _isIOS
+        ? CupertinoSearchTextField(
+      controller: _searchCtrl,
+      placeholder: 'Buscar en la planilla...',
+      onChanged: (v) => _vm.setQueryDebounced(v),
+    )
+        : TextField(
+      controller: _searchCtrl,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => FocusScope.of(context).unfocus(),
+      onChanged: (v) => _vm.setQueryDebounced(v),
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search),
+        hintText: 'Buscar en la planilla...',
+        isDense: true,
+        border: OutlineInputBorder(),
+      ),
+    );
+
+    final locBtn = ValueListenableBuilder2<double?, double?>(
+      first: _vm.lat,
+      second: _vm.lng,
+      builder: (_, la, lo, __) {
+        final hasLoc = la != null && lo != null;
+        return ValueListenableBuilder<bool>(
+          valueListenable: _vm.isBusy,
+          builder: (_, busy, __) {
+            return OutlinedButton.icon(
+              style: _chipStyle(t.surface),
+              onPressed: busy ? null : (hasLoc ? _showLocationSheet : _vm.saveLocation),
+              icon: busy
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(hasLoc ? Icons.check_circle : Icons.place_outlined),
+              label: Text(hasLoc ? 'Ubicación guardada' : 'Guardar ubicación'),
+            );
+          },
+        );
+      },
+    );
+
+    final counts = ValueListenableBuilder<List<Measurement>>(
+      valueListenable: _vm.measurements,
+      builder: (_, rows, __) {
+        final visible = _gridCtrl.snapshot().length;
+        final total = rows.length;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: table.gridLine),
+          ),
+          child: Text(
+            '$visible / $total',
+            style: TextStyle(
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .9),
             ),
-          );
+          ),
+        );
+      },
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -667,109 +604,34 @@ class _SheetScreenState extends State<SheetScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: LayoutBuilder(
-            builder: (ctx, c) {
-              final narrow = c.maxWidth < 520;
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(child: titleWidget),
-                      const SizedBox(width: 8),
-                      _shareMenuButton(compact: true),
-                    ]),
-                    const SizedBox(height: 8),
-                    locBtn,
-                  ],
-                );
-              } else {
-                return Row(
-                  children: [
-                    Expanded(child: titleWidget),
-                    const SizedBox(width: 8),
-                    Flexible(fit: FlexFit.loose, child: locBtn),
-                    const SizedBox(width: 8),
-                    _shareMenuButton(compact: false),
-                  ],
-                );
-              }
-            },
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: titleWidget),
+                  const SizedBox(width: 8),
+                  Flexible(fit: FlexFit.loose, child: search),
+                  const SizedBox(width: 8),
+                  counts,
+                  const SizedBox(width: 8),
+                  _shareMenuButton(),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Flexible(fit: FlexFit.loose, child: locBtn),
+                  const SizedBox(width: 8),
+                  Expanded(child: _toolsBar(t)),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  //──────────────────────────────── Filas con UID local
-  int _genTempId() => _nextTempId--;
-
-  Measurement _withLocalId(Measurement m) {
-    return (m.id != null) ? m : m.copyWith(id: _genTempId());
-  }
-
-  void _ensureLocalIds() {
-    // Asigna IDs locales a los que no tienen.
-    _currentMeasurements =
-        _currentMeasurements.map(_withLocalId).toList(growable: true);
-  }
-
-  int _indexOfById(Measurement m) {
-    final id = m.id;
-    if (id == null) return -1;
-    return _currentMeasurements.indexWhere((e) => e.id == id);
-  }
-
-  // Fallback por si llega un objeto sin id
-  int _indexOfByFields(Measurement m) {
-    return _currentMeasurements.indexWhere((e) =>
-        e.progresiva == m.progresiva &&
-        e.date == m.date &&
-        (e.latitude ?? 0.0) == (m.latitude ?? 0.0) &&
-        (e.longitude ?? 0.0) == (m.longitude ?? 0.0));
-  }
-
-  int _indexOfMeasurement(Measurement m) {
-    final byId = _indexOfById(m);
-    if (byId >= 0) return byId;
-    return _indexOfByFields(m);
-  }
-
-  void _onUpdateRow(Measurement updated) {
-    setState(() {
-      final i = _indexOfMeasurement(updated);
-      if (i >= 0) {
-        // Si el editor devuelve un objeto sin ID, restauramos el ID previo
-        // (local negativo o de BD) para no perder la referencia de la fila.
-        final oldId = _currentMeasurements[i].id;
-        final next = (updated.id != null || oldId == null)
-            ? updated
-            : updated.copyWith(id: oldId);
-        _currentMeasurements = List.of(_currentMeasurements)..[i] = next;
-      }
-    });
-  }
-
-  void _onDeleteRow(Measurement m) {
-    setState(() {
-      final i = _indexOfMeasurement(m);
-      if (i >= 0) {
-        _currentMeasurements = List.of(_currentMeasurements)..removeAt(i);
-      } else {
-        _currentMeasurements =
-            _currentMeasurements.where((e) => e != m).toList();
-      }
-    });
-  }
-
-  void _onDuplicateRow(Measurement m) {
-    setState(() {
-      final dup = m.copyWith(id: _genTempId());
-      _currentMeasurements = List.of(_currentMeasurements)..add(dup);
-    });
-  }
-
-  //──────────────────────────────── Build
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -779,45 +641,140 @@ class _SheetScreenState extends State<SheetScreen> {
         final table = GridnoteTableStyle.from(t);
 
         return Scaffold(
-          resizeToAvoidBottomInset: false,
+          resizeToAvoidBottomInset: true,
           backgroundColor: t.scaffold,
           appBar: AppBar(
-            title: Text('Planilla: ${widget.meta.id}',
-                overflow: TextOverflow.ellipsis),
-            bottom: _isBusy
-                ? const PreferredSize(
-                    preferredSize: Size.fromHeight(2),
-                    child: LinearProgressIndicator(minHeight: 2),
-                  )
-                : null,
-          ),
-          body: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: Container(
-              color: table.cellBg,
-              child: Column(
-                children: [
-                  _buildHeader(t, table),
-                  Expanded(
-                    child: MeasurementDataGrid(
-                      meta: widget.meta,
-                      initial: _currentMeasurements,
-                      themeController: widget.themeController,
-                      controller: _gridCtrl,
-                      autoWidth: true,
-                      enablePager: true,
-                      onOpenMaps: (m) => _openMapsFor(
-                        lat: m.latitude ?? _lat,
-                        lng: m.longitude ?? _lng,
-                      ),
-                      onUpdateRow: _onUpdateRow,
-                      onDeleteRow: _onDeleteRow,
-                      onDuplicateRow: _onDuplicateRow,
-                    ),
-                  ),
-                ],
+            centerTitle: _isIOS,
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            flexibleSpace: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(color: t.surface.withValues(alpha: .65)),
               ),
+            ),
+            title: ValueListenableBuilder<String>(
+              valueListenable: _vm.title,
+              builder: (_, title, __) => Text(title.isEmpty ? ' ' : title, overflow: TextOverflow.ellipsis),
+            ),
+            actions: [
+              ValueListenableBuilder<bool>(
+                valueListenable: _vm.canUndo,
+                builder: (_, canUndo, __) {
+                  if (!canUndo) return const SizedBox.shrink();
+                  return IconButton(
+                    tooltip: 'Deshacer',
+                    onPressed: _vm.undoLast,
+                    icon: const Icon(Icons.undo),
+                  );
+                },
+              ),
+              if (_isIOS)
+                ValueListenableBuilder<bool>(
+                  valueListenable: _vm.isBusy,
+                  builder: (_, busy, __) => IconButton(
+                    tooltip: 'Agregar fila',
+                    onPressed: busy ? null : _vm.addRow,
+                    icon: const Icon(CupertinoIcons.add_circled),
+                  ),
+                ),
+            ],
+            // bottom debe ser PreferredSizeWidget
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(2),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _vm.isBusy,
+                builder: (_, busy, __) =>
+                busy ? const LinearProgressIndicator(minHeight: 2) : const SizedBox(height: 2),
+              ),
+            ),
+          ),
+          body: Container(
+            color: table.cellBg,
+            child: Column(
+              children: [
+                _buildHeader(t, table),
+                Expanded(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _vm.formView,
+                    builder: (_, form, __) {
+                      if (form) {
+                        return ValueListenableBuilder<List<Measurement>>(
+                          valueListenable: _vm.measurements,
+                          builder: (_, rows, __) {
+                            return FormView(
+                              rows: rows,
+                              suggest: getIt<SuggestService>(),
+                              rules: defaultRules(),
+                              onChanged: (next) => _vm.replaceRows(next),
+                            );
+                          },
+                        );
+                      }
+                      return ValueListenableBuilder2<List<Measurement>, Map<String, String>>(
+                        first: _vm.measurements,
+                        second: _vm.headers,
+                        builder: (_, rows, headerTitles, __) {
+                          return ValueListenableBuilder<String>(
+                            valueListenable: _vm.searchQuery,
+                            builder: (_, q, __) {
+                              return MeasurementDataGrid(
+                                meta: widget.meta,
+                                initial: rows,
+                                themeController: widget.themeController,
+                                controller: _gridCtrl,
+                                autoWidth: true,
+                                filterQuery: q,
+                                headerTitles: headerTitles,
+                                onEditHeader: (col) async {
+                                  final ctl = TextEditingController(text: headerTitles[col] ?? '');
+                                  final txt = await showDialog<String>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Renombrar encabezado'),
+                                      content: TextField(
+                                        controller: ctl,
+                                        autofocus: true,
+                                        decoration:
+                                        const InputDecoration(hintText: 'Nuevo título (puede quedar vacío)'),
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
+                                          child: const Text('Guardar'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (txt != null) await _vm.setHeaderTitle(col, txt);
+                                },
+                                onOpenMaps: (m) => _vm.openMapsFor(
+                                  latParam: m.latitude ?? _vm.lat.value,
+                                  lngParam: m.longitude ?? _vm.lng.value,
+                                ),
+                                onChanged: (next) => _vm.replaceRows(next),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          floatingActionButton: _isIOS
+              ? null
+              : ValueListenableBuilder<bool>(
+            valueListenable: _vm.isBusy,
+            builder: (_, busy, __) => FloatingActionButton.extended(
+              onPressed: busy ? null : _vm.addRow,
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar fila'),
+              backgroundColor: t.accent,
             ),
           ),
         );

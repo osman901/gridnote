@@ -1,22 +1,36 @@
-// lib/screens/measurement_screen.dart
-import 'dart:io';
-
+// lib/screens/measurements_screen.dart
+import 'dart:async';
+import 'dart:ui' show ImageFilter;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_email_sender/flutter_email_sender.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
+import 'package:intl/intl.dart';
 
 import '../models/measurement.dart';
 import '../models/sheet_meta.dart';
+import '../models/share_option.dart';
 import '../theme/gridnote_theme.dart';
-import '../widgets/measurement_datagrid.dart';
+import '../widgets/measurement_pluto_grid.dart';
+import '../state/measurement_async_provider.dart';
+import '../state/measurement_repository.dart';
+import '../services/xlsx_export_service.dart';
+import '../services/email_share_service.dart';
+import '../services/location_service.dart';
+import '../services/usage_analytics.dart';
+import '../services/sheet_registry.dart';
+import '../widgets/drum_picker.dart';
+import '../providers/settings_provider.dart';
+import '../constants/app_styles.dart';
+import '../routing/fade_scale_route.dart';
 
-class MeasurementScreen extends StatefulWidget {
+final xlsxServiceProvider = Provider<XlsxExportService>((_) => XlsxExportService());
+final emailShareServiceProvider = Provider<EmailShareService>((_) => const EmailShareService());
+final locationServiceProvider = Provider<LocationService>((_) => LocationService.instance);
+final settingsServiceProvider = Provider<SettingsService>((_) => SettingsService());
+
+class MeasurementScreen extends ConsumerStatefulWidget {
   const MeasurementScreen({
     super.key,
     required this.id,
@@ -33,65 +47,100 @@ class MeasurementScreen extends StatefulWidget {
   final ValueChanged<String>? onTitleChanged;
 
   @override
-  State<MeasurementScreen> createState() => _MeasurementScreenState();
+  ConsumerState<MeasurementScreen> createState() => _MeasurementScreenState();
 }
 
-class _MeasurementScreenState extends State<MeasurementScreen> {
-  static const _kDefaultEmailKey = 'default_email';
-
-  // XLSX columns
-  static const int _cPro = 1;
-  static const int _cOhm1 = 2;
-  static const int _cOhm3 = 3;
-  static const int _cObs = 4;
-  static const int _cDate = 5;
-  static const int _cLat = 6;
-  static const int _cLng = 7;
-  static const int _cMaps = 8;
-
+class _MeasurementScreenState extends ConsumerState<MeasurementScreen> {
   bool _editingTitle = false;
   bool _isLoading = false;
+  bool _aiEnabled = true;
 
-  late final TextEditingController _titleCtrl;
-  final Future<SharedPreferences> _sp = SharedPreferences.getInstance();
+  late final TextEditingController _titleCtrl = TextEditingController(text: widget.meta.name);
 
   String? _defaultEmail;
   double? _lat;
   double? _lng;
+  String? _author; // autor de la planilla
 
-  late List<Measurement> _rows;
   final _gridCtrl = MeasurementGridController();
+
+  String _fmtDate(DateTime d) => DateFormat("d 'de' MMM. 'de' y", 'es').format(d);
 
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(text: widget.meta.name);
-    _rows = List<Measurement>.from(widget.initial);
+    _author = widget.meta.author;
     _loadDefaultEmail();
     _loadSavedLocation();
+    _loadAiPref();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cur = ref.read(measurementAsyncProvider(widget.meta.id));
+      final hasData = cur.hasValue && (cur.value?.isNotEmpty ?? false);
+      if (!hasData && widget.initial.isNotEmpty && mounted) {
+        ref.read(measurementAsyncProvider(widget.meta.id).notifier).setAll(widget.initial);
+      }
+      unawaited(SheetRegistry.instance.touch(widget.meta));
+    });
   }
 
   @override
   void didUpdateWidget(covariant MeasurementScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.initial, widget.initial)) {
-      setState(() => _rows = List<Measurement>.from(widget.initial));
-    }
     if (oldWidget.meta.name != widget.meta.name) {
       _titleCtrl.text = widget.meta.name;
+    }
+    if (oldWidget.meta.author != widget.meta.author) {
+      _author = widget.meta.author;
     }
   }
 
   @override
   void dispose() {
+    // Limpia banners que pudieran quedar visibles
+    ScaffoldMessenger.maybeOf(context)?.clearMaterialBanners();
     _titleCtrl.dispose();
     super.dispose();
   }
 
-  // ---------- helpers ----------
+  // ---------------- Avisos ----------------
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // Banner superior (no tapa la grilla)
+  void _notifyTop(
+      String msg, {
+        IconData icon = Icons.check_circle,
+        Duration duration = const Duration(milliseconds: 1500),
+      }) {
+    if (!mounted) return;
+    final t = widget.themeController.theme;
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger.clearMaterialBanners();
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        backgroundColor: t.surface,
+        leading: Icon(icon, color: t.accent),
+        content: Text(
+          msg,
+          style: TextStyle(color: t.text, fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          TextButton(
+            onPressed: messenger.removeCurrentMaterialBanner,
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    Future.delayed(duration, () {
+      if (!mounted) return;
+      messenger.removeCurrentMaterialBanner();
+    });
   }
 
   void _logError(Object error, [StackTrace? st]) {
@@ -100,7 +149,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   }
 
   Future<void> _withBusy(Future<void> Function() op) async {
-    if (!mounted) return op();
+    if (!mounted) {
+      await op();
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await op();
@@ -109,48 +161,27 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
     }
   }
 
-  // ---------- Prefs ----------
+  // ===== SettingsService (centralizado) =====
+  SettingsService get _settings => ref.read(settingsServiceProvider);
+
   Future<void> _loadDefaultEmail() async {
-    final sp = await _sp;
+    final v = await _settings.getDefaultEmail();
     if (!mounted) return;
-    setState(() => _defaultEmail = sp.getString(_kDefaultEmailKey));
+    setState(() => _defaultEmail = v);
   }
 
   Future<void> _saveDefaultEmail(String? email) async {
-    final sp = await _sp;
-    if (email == null || email.trim().isEmpty) {
-      await sp.remove(_kDefaultEmailKey);
-      if (!mounted) return;
-      setState(() => _defaultEmail = null);
-    } else {
-      final v = email.trim();
-      await sp.setString(_kDefaultEmailKey, v);
-      if (!mounted) return;
-      setState(() => _defaultEmail = v);
-    }
-  }
-
-  // ---------- Title ----------
-  Future<void> _saveTitle() async {
-    final v = _titleCtrl.text.trim();
-    if (v.isNotEmpty && v != widget.meta.name) {
-      widget.onTitleChanged?.call(v);
-    }
+    await _settings.saveDefaultEmail(email);
     if (!mounted) return;
-    setState(() => _editingTitle = false);
-    HapticFeedback.selectionClick();
+    setState(() => _defaultEmail = (email == null || email.trim().isEmpty) ? null : email.trim());
   }
-
-  // ---------- Location ----------
-  String get _latKey => 'sheet_${widget.meta.id}_lat';
-  String get _lngKey => 'sheet_${widget.meta.id}_lng';
 
   Future<void> _loadSavedLocation() async {
-    final sp = await _sp;
+    final loc = await _settings.getLocation(widget.meta.id);
     if (!mounted) return;
     setState(() {
-      _lat = sp.getDouble(_latKey);
-      _lng = sp.getDouble(_lngKey);
+      _lat = loc.lat;
+      _lng = loc.lng;
     });
   }
 
@@ -164,17 +195,12 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
         _snack('Sin permisos de ubicación.');
         return;
       }
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      final sp = await _sp;
-      await sp.setDouble(_latKey, pos.latitude);
-      await sp.setDouble(_lngKey, pos.longitude);
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      await _settings.saveLocation(widget.meta.id, pos.latitude, pos.longitude);
       if (!mounted) return;
       setState(() {
         _lat = pos.latitude;
@@ -187,125 +213,126 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
     }
   }
 
-  Future<void> _openMapsFor({double? lat, double? lng}) async {
-    final dLat = lat, dLng = lng;
-    if (dLat == null || dLng == null) return;
-    final uri = Uri.parse(_mapsUrl(dLat, dLng));
-    try {
-      if (await canLaunchUrl(uri)) {
-        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (!ok) _snack('No se pudo abrir la app de mapas.');
-      } else {
-        _snack('No se pudo abrir la app de mapas.');
-      }
-    } catch (e, st) {
-      _logError(e, st);
-      _snack('No se pudo abrir la app de mapas.');
-    }
+  Future<void> _loadAiPref() async {
+    final v = await _settings.getAiEnabled(widget.meta.id);
+    if (!mounted) return;
+    setState(() => _aiEnabled = v);
   }
 
-  String _mapsUrl(double lat, double lng) =>
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+  Future<void> _toggleAi() async {
+    setState(() => _aiEnabled = !_aiEnabled);
+    await _settings.setAiEnabled(widget.meta.id, _aiEnabled);
+    UsageAnalytics.instance.bump(_aiEnabled ? 'ai_enabled_on' : 'ai_enabled_off');
+    _snack(_aiEnabled ? 'IA activada' : 'IA desactivada');
+  }
+  // =========================================
 
-  // ---------- XLSX / Share ----------
-  String _safeFileName(String name) {
-    final cleaned = name.trim().isEmpty ? 'planilla' : name.trim();
-    return cleaned
-        .replaceAll(RegExp(r'[^a-zA-Z0-9_\- ]'), '_')
-        .replaceAll(' ', '_');
+  List<Measurement> _currentAllRows() {
+    final asyncAll = ref.read(measurementAsyncProvider(widget.meta.id));
+    return asyncAll.hasValue ? (asyncAll.value ?? const <Measurement>[]) : const <Measurement>[];
   }
 
-  Future<List<int>> _buildXlsx(List<Measurement> data) async {
-    final book = xlsio.Workbook();
-    final sheet = book.worksheets[0];
-    sheet.name = 'Datos';
-
-    // Headers
-    sheet.getRangeByIndex(1, _cPro).setText('Progresiva');
-    sheet.getRangeByIndex(1, _cOhm1).setText('1 m Ω');
-    sheet.getRangeByIndex(1, _cOhm3).setText('3 m Ω');
-    sheet.getRangeByIndex(1, _cObs).setText('Obs');
-    sheet.getRangeByIndex(1, _cDate).setText('Fecha');
-    sheet.getRangeByIndex(1, _cLat).setText('Latitud');
-    sheet.getRangeByIndex(1, _cLng).setText('Longitud');
-    sheet.getRangeByIndex(1, _cMaps).setText('Maps');
-    sheet.getRangeByIndex(1, _cPro, 1, _cMaps).cellStyle.bold = true;
-
-    final gLat = _lat, gLng = _lng;
-    var r = 2;
-    for (final m in data) {
-      sheet.getRangeByIndex(r, _cPro).setText(m.progresiva);
-      sheet.getRangeByIndex(r, _cOhm1).setNumber(m.ohm1m);
-      sheet.getRangeByIndex(r, _cOhm3).setNumber(m.ohm3m);
-      sheet.getRangeByIndex(r, _cObs).setText(m.observations);
-
-      sheet.getRangeByIndex(r, _cDate).setDateTime(m.date);
-      sheet.getRangeByIndex(r, _cDate).numberFormat = 'dd/mm/yyyy';
-
-      final rowLat = m.latitude ?? gLat;
-      final rowLng = m.longitude ?? gLng;
-      if (rowLat != null && rowLng != null) {
-        sheet.getRangeByIndex(r, _cLat).setNumber(rowLat);
-        sheet.getRangeByIndex(r, _cLng).setNumber(rowLng);
-        sheet.getRangeByIndex(r, _cLat, r, _cLng).numberFormat = '0.000000';
-        sheet.getRangeByIndex(r, _cMaps).setFormula(
-              'HYPERLINK("${_mapsUrl(rowLat, rowLng)}","Ver")',
-            );
-      }
-      r++;
-    }
-
-    sheet.getRangeByIndex(1, _cObs, r - 1, _cObs).cellStyle.wrapText = true;
-
-    for (var c = _cPro; c <= _cMaps; c++) {
-      sheet.autoFitColumn(c);
-    }
-    for (var i = 1; i < r; i++) {
-      sheet.autoFitRow(i);
-    }
-
-    final bytes = book.saveAsStream(); // List<int>
-    book.dispose();
-    return bytes;
+  void _updateRowsSafely(List<Measurement> rows) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Future<void>.delayed(Duration.zero, () {
+        if (!mounted) return;
+        ref.read(measurementAsyncProvider(widget.meta.id).notifier).setAll(rows);
+      });
+    });
   }
 
-  Future<File> _writeTempXlsx(List<int> bytes) async {
-    final dir = await getTemporaryDirectory();
-    final base = _safeFileName(widget.meta.name);
-    final ts = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '')
-        .replaceAll('.', '')
-        .replaceAll('-', '');
-    final file = File('${dir.path}/gridnote_${base}_$ts.xlsx');
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
+  Future<void> _addRow() async {
+    final current = _currentAllRows().isEmpty ? widget.initial : _currentAllRows();
+    final rows = List<Measurement>.from(current);
+    final maxId = rows.isEmpty ? 0 : rows.map((e) => e.id ?? 0).reduce((a, b) => a > b ? a : b);
+    final nextId = maxId + 1;
+
+    rows.add(Measurement(
+      id: nextId,
+      progresiva: '',
+      ohm1m: 0.0,
+      ohm3m: 0.0,
+      observations: '',
+      date: DateTime.now(),
+      latitude: _lat,
+      longitude: _lng,
+    ));
+    _updateRowsSafely(rows);
+    _notifyTop('Fila agregada'); // banner arriba
+    HapticFeedback.selectionClick();
   }
 
-  bool _isEmailValid(String e) {
-    final s = e.trim();
-    final re = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
-    return re.hasMatch(s);
+  Future<void> _saveChanges() async {
+    await _withBusy(() async {
+      final items = _currentAllRows();
+      final repo = ref.read(measurementRepoProvider(widget.meta.id));
+      await repo.saveAll(items);
+      _notifyTop('Cambios guardados'); // antes: _snack(...)
+    });
+  }
+
+  Future<void> _saveTitle() async {
+    final v = _titleCtrl.text.trim();
+    if (v.isNotEmpty && v != widget.meta.name) {
+      final updated = widget.meta.copyWith(name: v, author: _author);
+      await SheetRegistry.instance.upsert(updated);
+      widget.onTitleChanged?.call(v);
+    }
+    if (!mounted) return;
+    setState(() => _editingTitle = false);
+    HapticFeedback.selectionClick();
+  }
+
+  Future<void> _editAuthor() async {
+    final ctl = TextEditingController(text: _author ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Autor de la planilla'),
+        content: TextField(
+          controller: ctl,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Nombre del empleado',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+          onSubmitted: (_) => Navigator.pop(ctx, ctl.text.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    if (value == null) return;
+    final trimmed = value.isEmpty ? null : value;
+    final updated = widget.meta.copyWith(author: trimmed);
+    await SheetRegistry.instance.upsert(updated);
+    if (!mounted) return;
+    setState(() => _author = trimmed);
+    _snack('Autor actualizado.');
   }
 
   String _buildEmailBody(List<Measurement> rows) {
     final b = StringBuffer();
     b.writeln('Adjunto XLSX generado con Gridnote para "${widget.meta.name}".');
-
+    if ((_author ?? '').isNotEmpty) {
+      b.writeln('Hecha por: ${_author!}');
+    }
     final lat = _lat, lng = _lng;
+    final locSvc = ref.read(locationServiceProvider);
     if (lat != null && lng != null) {
       b.writeln('');
       b.writeln('Ubicación general:');
-      b.writeln(_mapsUrl(lat, lng));
+      b.writeln(locSvc.mapsUrl(lat, lng));
     }
-
-    final withCoords =
-        rows.where((m) => (m.latitude != null && m.longitude != null)).toList();
+    final withCoords = rows.where((m) => (m.latitude != null && m.longitude != null)).toList();
     if (withCoords.isNotEmpty) {
       b.writeln('');
       b.writeln('Enlaces por fila:');
       for (final m in withCoords.take(10)) {
-        final url = _mapsUrl(m.latitude!, m.longitude!);
+        final url = locSvc.mapsUrl(m.latitude!, m.longitude!);
         final prog = (m.progresiva.isEmpty) ? '-' : m.progresiva;
         b.writeln('• $prog → $url');
       }
@@ -319,72 +346,42 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
   Future<void> _shareViaEmail({required List<Measurement> rows}) async {
     final email = await _askForEmail(initial: _defaultEmail);
     if (email == null) return;
-
     final trimmed = email.trim();
-    if (!_isEmailValid(trimmed)) {
+    final re = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
+    if (!re.hasMatch(trimmed)) {
       _snack('Email inválido. Revisá el destinatario.');
       return;
     }
-
-    final bytes = await _buildXlsx(rows);
-    final file = await _writeTempXlsx(bytes);
+    final file = await ref.read(xlsxServiceProvider).buildFile(
+      sheetId: widget.meta.id,
+      title: widget.meta.name,
+      data: rows,
+      defaultLat: _lat,
+      defaultLng: _lng,
+    );
     final bodyText = _buildEmailBody(rows);
-
-    final mail = Email(
-      recipients: [trimmed],
+    await ref.read(emailShareServiceProvider).sendWithFallback(
+      to: trimmed,
       subject: 'Gridnote – ${widget.meta.name}',
       body: bodyText,
-      attachmentPaths: [file.path],
-      isHTML: false,
+      attachment: file,
     );
-
-    try {
-      await FlutterEmailSender.send(mail);
-      _snack('Se abrió tu app de correo. Tocá “Enviar”.');
-      return;
-    } catch (e, st) {
-      _logError(e, st);
-      final mailto = Uri(
-        scheme: 'mailto',
-        path: trimmed,
-        queryParameters: <String, String>{
-          'subject': 'Gridnote – ${widget.meta.name}',
-          'body': bodyText,
-        },
-      );
-      try {
-        if (await canLaunchUrl(mailto)) {
-          final ok =
-              await launchUrl(mailto, mode: LaunchMode.externalApplication);
-          if (ok) return;
-        }
-      } catch (e2, st2) {
-        _logError(e2, st2);
-      }
-      await Share.shareXFiles(
-        [
-          XFile(
-            file.path,
-            mimeType:
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          ),
-        ],
-        subject: 'Gridnote – ${widget.meta.name}',
-        text: bodyText,
-      );
-    }
+    _notifyTop('XLSX listo para enviar'); // antes: _snack(...)
   }
 
   Future<String?> _askForEmail({String? initial}) async {
     final ctl = TextEditingController(text: initial ?? '');
-    bool saveAsDefault = false;
+    var saveAsDefault = false;
 
     final result = await showModalBottomSheet<String>(
       context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      builder: (ctx) {
+        final bottomPad = MediaQuery.viewInsetsOf(ctx).bottom + 20;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad),
           child: StatefulBuilder(
             builder: (context, setSB) {
               return Column(
@@ -439,184 +436,278 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
               );
             },
           ),
-        ),
-      ),
+        );
+      },
     );
     return result;
   }
 
-  ButtonStyle _chipStyle(Color surface) => OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        visualDensity: VisualDensity.compact,
-        shape: const StadiumBorder(),
-        backgroundColor: surface,
-      );
-
-  Widget _buildHeader(GridnoteTheme t, GridnoteTableStyle table) {
-    final hasLoc = _lat != null && _lng != null;
-
-    final locBtn = OutlinedButton.icon(
-      style: _chipStyle(t.surface),
-      onPressed: hasLoc
-          ? () => _openMapsFor(lat: _lat, lng: _lng)
-          : () => _withBusy(_saveLocation),
-      icon: Icon(hasLoc ? Icons.check_circle : Icons.place_outlined),
-      label: Text(hasLoc ? 'Ubicación guardada' : 'Guardar ubicación'),
-    );
-
-    final titleWidget = _editingTitle
-        ? TextField(
-            controller: _titleCtrl,
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-            decoration: const InputDecoration(
-                isCollapsed: true, border: InputBorder.none),
-            onSubmitted: (_) => _saveTitle(),
-            onTapOutside: (_) => _saveTitle(),
-          )
-        : GestureDetector(
-            onTap: () => setState(() => _editingTitle = true),
-            child: Text(
-              widget.meta.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+  Future<void> _openAiMenu() async {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Stack(
+        children: [
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(color: Colors.black.withValues(alpha: 0.18)),
             ),
-          );
-
-    final shareBtn = FilledButton.tonalIcon(
-      onPressed: () =>
-          _withBusy(() => _shareViaEmail(rows: _gridCtrl.snapshot())),
-      icon: const Icon(Icons.ios_share_outlined),
-      label: const Text('Compartir'),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: t.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: table.gridLine),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: LayoutBuilder(
-            builder: (ctx, c) {
-              final narrow = c.maxWidth < 520;
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.45,
+            minChildSize: 0.30,
+            maxChildSize: 0.85,
+            builder: (ctx, controller) {
+              final bottomPad = MediaQuery.viewInsetsOf(ctx).bottom + 16;
+              final t = widget.themeController.theme;
+              return Container(
+                decoration: BoxDecoration(
+                  color: t.surface.withValues(alpha: .86),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                  border: Border(top: BorderSide(color: t.divider)),
+                ),
+                child: ListView(
+                  controller: controller,
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad),
                   children: [
-                    Row(children: [
-                      Expanded(child: titleWidget),
-                      const SizedBox(width: 8),
-                      shareBtn,
-                    ]),
-                    const SizedBox(height: 8),
-                    locBtn,
+                    ListTile(
+                      leading: Icon(_aiEnabled ? Icons.psychology : Icons.psychology_outlined),
+                      title: Text(_aiEnabled ? 'IA activada' : 'IA desactivada'),
+                      subtitle: const Text('Sugerencias contextuales mientras editás'),
+                      trailing: CupertinoSwitch(
+                        value: _aiEnabled,
+                        onChanged: (_) => _toggleAi(),
+                      ),
+                      onTap: _toggleAi,
+                    ),
+                    const Divider(height: 0),
+                    const ListTile(
+                      leading: Icon(Icons.smart_toy_outlined),
+                      title: Text('Atajos IA'),
+                      subtitle: Text('Acciones sobre la fila/celda seleccionada'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.place_outlined),
+                      title: const Text('Poner ubicación general en la fila'),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        if (_lat == null || _lng == null) {
+                          _snack('Guardá primero la ubicación general.');
+                          return;
+                        }
+                        await _gridCtrl.setLocationOnSelection(_lat!, _lng!);
+                        _snack('Ubicación aplicada a la fila.');
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.photo_camera_outlined),
+                      title: const Text('Agregar foto a la fila'),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _gridCtrl.addPhotoOnSelection();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.format_color_fill),
+                      title: const Text('Resaltar celda'),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await _gridCtrl.colorCellSelected(AppStyles.cellHighlight);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.font_download_outlined),
+                      title: const Text('Usar fuente monoespaciada'),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _gridCtrl.setFontFamily(AppStyles.monoFontFamily);
+                      },
+                    ),
+                    const SizedBox(height: 6),
                   ],
-                );
-              } else {
-                return Row(
-                  children: [
-                    Expanded(child: titleWidget),
-                    const SizedBox(width: 8),
-                    Flexible(fit: FlexFit.loose, child: locBtn),
-                    const SizedBox(width: 8),
-                    shareBtn,
-                  ],
-                );
-              }
+                ),
+              );
             },
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // ---------- Row CRUD ----------
-  void _onUpdateRow(Measurement updated) {
-    setState(() {
-      final next = List<Measurement>.from(_rows);
-      int idx = next.indexWhere((e) => e.id != null && e.id == updated.id);
-      if (idx < 0) {
-        idx = next.indexWhere(
-          (e) =>
-              e.id == null &&
-              e.progresiva == updated.progresiva &&
-              e.date == updated.date,
-        );
-      }
-      if (idx >= 0) next[idx] = updated;
-      _rows = next;
-    });
+  Future<void> _openSheetDrum() async {
+    final t = widget.themeController.theme;
+    final items = await SheetRegistry.instance.getAllSorted();
+
+    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (!mounted) return;
+
+    final selected = await showSheetDrumPicker(
+      context: context,
+      items: items,
+      title: 'Planillas',
+      accent: t.accent,
+      textColor: t.text,
+      surface: t.surface,
+      divider: t.divider,
+      onCreateNew: () => SheetRegistry.instance.create(name: 'Planilla nueva'),
+      initial: widget.meta,
+      subtitleBuilder: (m) => 'Modificado: ${_fmtDate(m.createdAt)}',
+    );
+    if (!mounted || selected == null || selected.id == widget.meta.id) return;
+
+    await SheetRegistry.instance.touch(selected);
+    if (!mounted) return;
+
+    Navigator.of(context).push(FadeScaleRoute(
+      child: MeasurementScreen(
+        id: selected.id,
+        meta: selected,
+        initial: const <Measurement>[],
+        themeController: widget.themeController,
+      ),
+    ));
   }
 
-  void _onDeleteRow(Measurement m) {
-    setState(() {
-      final next = List<Measurement>.from(_rows);
-      next.removeWhere(
-        (e) =>
-            (e.id != null && e.id == m.id) ||
-            (e.id == null && e.progresiva == m.progresiva && e.date == m.date),
-      );
-      _rows = next;
-    });
-    _snack('Fila eliminada.');
-  }
-
-  void _onDuplicateRow(Measurement m) {
-    setState(() {
-      final next = List<Measurement>.from(_rows);
-      next.add(m.copyWith(id: null));
-      _rows = next;
-    });
-    _snack('Fila duplicada.');
-  }
-
-  // ---------- Build ----------
   @override
   Widget build(BuildContext context) {
+    final isSaving = ref.watch(isSavingProvider);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return AnimatedBuilder(
       animation: widget.themeController,
       builder: (_, __) {
         final t = widget.themeController.theme;
         final table = GridnoteTableStyle.from(t);
 
+        final headerCard = _HeaderBar(
+          theme: t,
+          titleCtrl: _titleCtrl,
+          editingTitle: _editingTitle,
+          onTapEditTitle: () => setState(() => _editingTitle = true),
+          onSaveTitle: _saveTitle,
+          hasLocation: _lat != null && _lng != null,
+          onLocationPressed: (_lat != null && _lng != null)
+              ? () async {
+            final ok = await ref.read(locationServiceProvider).openInMaps(
+              lat: _lat!,
+              lng: _lng!,
+            );
+            if (!ok) _snack('No se pudo abrir la app de mapas.');
+          }
+              : () => _withBusy(_saveLocation),
+          aiEnabled: _aiEnabled,
+          onToggleAi: _toggleAi,
+          author: _author,
+          onEditAuthor: _editAuthor,
+          onSharePressed: () => _withBusy(() async {
+            final rows = ref.read(measurementFilteredAsyncProvider(widget.meta.id)).maybeWhen(
+              data: (r) => r,
+              orElse: () => const <Measurement>[],
+            );
+            if (rows.isEmpty) {
+              _snack('No hay filas visibles para compartir.');
+              return;
+            }
+            await _shareViaEmail(rows: rows);
+          }),
+        );
+
+        final grid = RepaintBoundary(
+          child: MeasurementDataGrid(
+            meta: widget.meta,
+            initial: _currentAllRows().isEmpty ? widget.initial : _currentAllRows(),
+            themeController: widget.themeController,
+            controller: _gridCtrl,
+            headerTitles: const <String, String>{},
+            onEditHeader: (_) {},
+            onChanged: _updateRowsSafely,
+            onOpenMaps: (m) async {
+              final lat = m.latitude ?? _lat;
+              final lng = m.longitude ?? _lng;
+              if (lat == null || lng == null) return;
+              final ok = await ref.read(locationServiceProvider).openInMaps(lat: lat, lng: lng);
+              if (!ok) _snack('No se pudo abrir la app de mapas.');
+            },
+            aiEnabled: _aiEnabled,
+          ),
+        );
+
+        final fabRail = (!keyboardOpen)
+            ? _MiniRail(
+          theme: t,
+          table: table,
+          isBusy: _isLoading || isSaving,
+          onAddRow: _addRow,
+          onSave: _saveChanges,
+        )
+            : const SizedBox.shrink();
+
         return Scaffold(
-          resizeToAvoidBottomInset: false,
+          resizeToAvoidBottomInset: true,
           backgroundColor: t.scaffold,
           appBar: AppBar(
-            title: Text('Planilla: ${widget.meta.id}',
-                overflow: TextOverflow.ellipsis),
+            title: Text('Planilla: ${widget.meta.id}', overflow: TextOverflow.ellipsis),
             actions: [
-              PopupMenuButton<String>(
+              IconButton(
+                tooltip: 'Planillas (tambor)',
+                icon: const Icon(CupertinoIcons.square_stack_3d_up),
+                onPressed: _openSheetDrum,
+              ),
+              IconButton(
+                tooltip: _aiEnabled ? 'IA activada (tocar para desactivar)' : 'IA desactivada (tocar para activar)',
+                icon: Icon(_aiEnabled ? Icons.psychology : Icons.psychology_outlined),
+                onPressed: _toggleAi,
+              ),
+              IconButton(
+                tooltip: 'Asistente IA',
+                icon: const Icon(Icons.smart_toy_outlined),
+                onPressed: _openAiMenu,
+              ),
+              PopupMenuButton<ShareOption>(
                 tooltip: 'Compartir / Exportar',
                 onSelected: (v) async {
                   switch (v) {
-                    case 'send_visible':
-                      await _withBusy(
-                          () => _shareViaEmail(rows: _gridCtrl.snapshot()));
+                    case ShareOption.sendVisible:
+                      await _withBusy(() async {
+                        final rows = ref.read(measurementFilteredAsyncProvider(widget.meta.id)).maybeWhen(
+                          data: (r) => r,
+                          orElse: () => const <Measurement>[],
+                        );
+                        if (rows.isEmpty) {
+                          _snack('No hay filas visibles para compartir.');
+                          return;
+                        }
+                        await _shareViaEmail(rows: rows);
+                      });
                       break;
-                    case 'send_all':
-                      await _withBusy(() =>
-                          _shareViaEmail(rows: List<Measurement>.from(_rows)));
+                    case ShareOption.sendAll:
+                      await _withBusy(() async {
+                        final rows = _currentAllRows();
+                        if (rows.isEmpty) {
+                          _snack('No hay filas para compartir.');
+                          return;
+                        }
+                        await _shareViaEmail(rows: rows);
+                      });
                       break;
                   }
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(
-                    value: 'send_visible',
+                    value: ShareOption.sendVisible,
                     child: ListTile(
                       leading: Icon(Icons.filter_alt_outlined),
                       title: Text('Enviar XLSX (solo visible)'),
                     ),
                   ),
                   PopupMenuItem(
-                    value: 'send_all',
+                    value: ShareOption.sendAll,
                     child: ListTile(
                       leading: Icon(Icons.grid_on_outlined),
                       title: Text('Enviar XLSX (todas las filas)'),
@@ -627,50 +718,258 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
               ),
             ],
           ),
-          body: GestureDetector(
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: Stack(
-              children: [
-                Container(
-                  color: table.cellBg,
-                  child: Column(
-                    children: [
-                      _buildHeader(t, table),
-                      Expanded(
-                        child: MeasurementDataGrid(
-                          meta: widget.meta,
-                          initial: _rows,
-                          themeController: widget.themeController,
-                          controller: _gridCtrl,
-                          autoWidth: true,
-                          enablePager: true,
-                          onOpenMaps: (m) => _openMapsFor(
-                            lat: m.latitude ?? _lat,
-                            lng: m.longitude ?? _lng,
-                          ),
-                          onUpdateRow: _onUpdateRow,
-                          onDeleteRow: _onDeleteRow,
-                          onDuplicateRow: _onDuplicateRow,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_isLoading)
-                  Positioned.fill(
-                    child: AbsorbPointer(
-                      child: Container(
-                        color: Colors.black.withOpacity(0.25),
-                        alignment: Alignment.center,
-                        child: const CircularProgressIndicator(),
+          body: Stack(
+            children: [
+              Container(
+                color: table.cellBg,
+                child: Column(
+                  children: [
+                    RepaintBoundary(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: headerCard,
                       ),
                     ),
+                    Expanded(
+                      child: RefreshIndicator.adaptive(
+                        displacement: 64,
+                        onRefresh: () => ref.read(measurementAsyncProvider(widget.meta.id).notifier).reload(),
+                        child: ScrollConfiguration(
+                          behavior: const _BounceBehavior(),
+                          child: grid,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!keyboardOpen) Positioned(right: 12, bottom: 12, child: RepaintBoundary(child: fabRail)),
+              if (_isLoading || isSaving)
+                const Positioned.fill(
+                  child: AbsorbPointer(
+                    child: ColoredBox(
+                      color: Color(0x3F000000),
+                      child: Center(child: CupertinoActivityIndicator()),
+                    ),
                   ),
-              ],
-            ),
+                ),
+            ],
+          ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+          floatingActionButton: keyboardOpen
+              ? null
+              : FloatingActionButton.extended(
+            onPressed: _openAiMenu,
+            backgroundColor: t.accent,
+            icon: const Icon(Icons.smart_toy_outlined, color: Colors.black),
+            label: const Text('IA'),
           ),
         );
       },
     );
+  }
+}
+
+class _HeaderBar extends StatelessWidget {
+  const _HeaderBar({
+    required this.theme,
+    required this.titleCtrl,
+    required this.editingTitle,
+    required this.onTapEditTitle,
+    required this.onSaveTitle,
+    required this.hasLocation,
+    required this.onLocationPressed,
+    required this.aiEnabled,
+    required this.onToggleAi,
+    required this.author,
+    required this.onEditAuthor,
+    required this.onSharePressed,
+  });
+
+  final GridnoteTheme theme;
+  final TextEditingController titleCtrl;
+  final bool editingTitle;
+  final VoidCallback onTapEditTitle;
+  final Future<void> Function() onSaveTitle;
+  final bool hasLocation;
+  final Future<void> Function() onLocationPressed;
+  final bool aiEnabled;
+  final Future<void> Function() onToggleAi;
+  final String? author;
+  final Future<void> Function() onEditAuthor;
+  final Future<void> Function() onSharePressed;
+
+  ButtonStyle _chipStyle(Color surface) => OutlinedButton.styleFrom(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    visualDensity: VisualDensity.compact,
+    shape: const StadiumBorder(),
+    backgroundColor: surface,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final table = GridnoteTableStyle.from(theme);
+
+    final locBtn = OutlinedButton.icon(
+      style: _chipStyle(theme.surface),
+      onPressed: onLocationPressed,
+      icon: Icon(hasLocation ? Icons.check_circle : Icons.place_outlined),
+      label: Text(hasLocation ? 'Ubicación guardada' : 'Guardar ubicación'),
+    );
+
+    final authorBtn = OutlinedButton.icon(
+      style: _chipStyle(theme.surface),
+      onPressed: onEditAuthor,
+      icon: const Icon(Icons.person_outline),
+      label: Text(
+        (author == null || author!.trim().isEmpty) ? 'Agregar autor' : 'Autor: ${author!}',
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    final titleWidget = editingTitle
+        ? TextField(
+      controller: titleCtrl,
+      autofocus: true,
+      textInputAction: TextInputAction.done,
+      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+      decoration: const InputDecoration(isCollapsed: true, border: InputBorder.none),
+      onSubmitted: (_) => onSaveTitle(),
+      onTapOutside: (_) => onSaveTitle(),
+    )
+        : GestureDetector(
+      onTap: onTapEditTitle,
+      child: Text(
+        titleCtrl.text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+      ),
+    );
+
+    final shareBtn = FilledButton.tonalIcon(
+      onPressed: onSharePressed,
+      icon: const Icon(Icons.ios_share_outlined),
+      label: const Text('Compartir'),
+    );
+
+    final aiPill = OutlinedButton.icon(
+      style: _chipStyle(theme.surface),
+      onPressed: onToggleAi,
+      icon: Icon(aiEnabled ? Icons.psychology : Icons.psychology_outlined),
+      label: Text(aiEnabled ? 'IA activada' : 'IA desactivada'),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: table.gridLine),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: LayoutBuilder(
+          builder: (ctx, c) {
+            final narrow = c.maxWidth < 520;
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(child: titleWidget),
+                    const SizedBox(width: 8),
+                    shareBtn,
+                  ]),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [locBtn, authorBtn, aiPill],
+                  ),
+                ],
+              );
+            } else {
+              return Row(
+                children: [
+                  Expanded(child: titleWidget),
+                  const SizedBox(width: 8),
+                  Flexible(fit: FlexFit.loose, child: locBtn),
+                  const SizedBox(width: 8),
+                  Flexible(fit: FlexFit.loose, child: authorBtn),
+                  const SizedBox(width: 8),
+                  aiPill,
+                  const SizedBox(width: 8),
+                  shareBtn,
+                ],
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniRail extends StatelessWidget {
+  const _MiniRail({
+    required this.theme,
+    required this.table,
+    required this.isBusy,
+    required this.onAddRow,
+    required this.onSave,
+  });
+
+  final GridnoteTheme theme;
+  final GridnoteTableStyle table;
+  final bool isBusy;
+  final Future<void> Function() onAddRow;
+  final Future<void> Function() onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.surface.withValues(alpha: .82),
+            border: Border.all(color: table.gridLine),
+            boxShadow: const [BoxShadow(blurRadius: 8, offset: Offset(0, 2), color: Color(0x42000000))],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Agregar fila',
+                  onPressed: isBusy ? null : onAddRow,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+                const SizedBox(width: 6),
+                FilledButton.icon(
+                  onPressed: isBusy ? null : onSave,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Guardar'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BounceBehavior extends ScrollBehavior {
+  const _BounceBehavior();
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+    return StretchingOverscrollIndicator(axisDirection: details.direction, child: child);
   }
 }

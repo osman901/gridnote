@@ -20,12 +20,12 @@ class MeasurementRowEditor extends StatefulWidget {
   final ValueChanged<Measurement>? onDuplicate;
 
   static Future<void> show(
-    BuildContext context, {
-    required Measurement initial,
-    required ValueChanged<Measurement> onSave,
-    ValueChanged<Measurement>? onDelete,
-    ValueChanged<Measurement>? onDuplicate,
-  }) {
+      BuildContext context, {
+        required Measurement initial,
+        required ValueChanged<Measurement> onSave,
+        ValueChanged<Measurement>? onDelete,
+        ValueChanged<Measurement>? onDuplicate,
+      }) {
     return showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -63,10 +63,10 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
   @override
   void initState() {
     super.initState();
-    m = widget.initial; // sin copy(); evitamos error si no existe
+    m = widget.initial;
     _progCtrl.text = m.progresiva;
-    _ohm1Ctrl.text = m.ohm1m.toString() ?? '';
-    _ohm3Ctrl.text = m.ohm3m.toString() ?? '';
+    _ohm1Ctrl.text = m.ohm1m?.toString() ?? '';
+    _ohm3Ctrl.text = m.ohm3m?.toString() ?? '';
     _obsCtrl.text = m.observations;
     _latCtrl.text = m.latitude?.toStringAsFixed(6) ?? '';
     _lonCtrl.text = m.longitude?.toStringAsFixed(6) ?? '';
@@ -88,8 +88,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
   }
 
   // Utilidades
-  TextInputFormatter get _numFmt => FilteringTextInputFormatter.allow(
-      RegExp(r'[0-9\-.,]')); // sin escape redundante
+  TextInputFormatter get _numFmt =>
+      FilteringTextInputFormatter.allow(RegExp(r'[0-9\-.,]'));
 
   double? _toDouble(String s) {
     final t = s.replaceAll(',', '.').trim();
@@ -204,9 +204,9 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                     onPressed: widget.onDuplicate == null
                         ? null
                         : () {
-                            widget.onDuplicate!(m.copyWith(id: null));
-                            Navigator.of(context).maybePop();
-                          },
+                      widget.onDuplicate!(m.copyWith(id: null));
+                      Navigator.of(context).maybePop();
+                    },
                     icon: const Icon(Icons.copy_all),
                   ),
                   IconButton(
@@ -214,9 +214,9 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                     onPressed: widget.onDelete == null
                         ? null
                         : () {
-                            widget.onDelete!(m);
-                            Navigator.of(context).maybePop();
-                          },
+                      widget.onDelete!(m);
+                      Navigator.of(context).maybePop();
+                    },
                     icon: const Icon(Icons.delete_outline),
                   ),
                 ],
@@ -236,7 +236,7 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                       focusNode: _nodes[1],
                       controller: _ohm1Ctrl,
                       keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(labelText: '1 m Ω'),
@@ -253,7 +253,7 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                       focusNode: _nodes[2],
                       controller: _ohm3Ctrl,
                       keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [_numFmt],
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(labelText: '3 m Ω'),
@@ -336,8 +336,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
                         decoration: const InputDecoration(labelText: 'Fecha'),
                         child: Text(
                           '${_date.day.toString().padLeft(2, '0')}/'
-                          '${_date.month.toString().padLeft(2, '0')}/'
-                          '${_date.year}',
+                              '${_date.month.toString().padLeft(2, '0')}/'
+                              '${_date.year}',
                         ),
                       ),
                     ),
@@ -366,7 +366,7 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
         padding:
-            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: _KeyboardBar(
           onPrev: _focusPrev,
           onNext: _focusNext,

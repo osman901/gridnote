@@ -30,29 +30,29 @@ class OutboxItem {
   DateTime? lastTryAt;
 
   Map<String, dynamic> toJson() => {
-        'kind': kind.name,
-        'path': path,
-        'filename': filename,
-        'to': to,
-        'subject': subject,
-        'text': text,
-        'attempts': attempts,
-        'lastTryAt': lastTryAt?.millisecondsSinceEpoch,
-      };
+    'kind': kind.name,
+    'path': path,
+    'filename': filename,
+    'to': to,
+    'subject': subject,
+    'text': text,
+    'attempts': attempts,
+    'lastTryAt': lastTryAt?.millisecondsSinceEpoch,
+  };
 
   static OutboxItem fromJson(Map data) => OutboxItem(
-        kind: (data['kind'] == 'pdf') ? OutboxKind.pdf : OutboxKind.excel,
-        path: (data['path'] as String?) ?? '',
-        filename: (data['filename'] as String?) ??
-            p.basename((data['path'] as String?) ?? 'file'),
-        to: data['to'] as String?,
-        subject: data['subject'] as String?,
-        text: data['text'] as String?,
-        attempts: (data['attempts'] as int?) ?? 0,
-        lastTryAt: (data['lastTryAt'] != null)
-            ? DateTime.fromMillisecondsSinceEpoch(data['lastTryAt'] as int)
-            : null,
-      );
+    kind: (data['kind'] == 'pdf') ? OutboxKind.pdf : OutboxKind.excel,
+    path: (data['path'] as String?) ?? '',
+    filename: (data['filename'] as String?) ??
+        p.basename((data['path'] as String?) ?? 'file'),
+    to: data['to'] as String?,
+    subject: data['subject'] as String?,
+    text: data['text'] as String?,
+    attempts: (data['attempts'] as int?) ?? 0,
+    lastTryAt: (data['lastTryAt'] != null)
+        ? DateTime.fromMillisecondsSinceEpoch(data['lastTryAt'] as int)
+        : null,
+  );
 }
 
 class OutboxService {
@@ -63,16 +63,19 @@ class OutboxService {
   static const Duration _baseBackoff = Duration(seconds: 15);
   static const Duration _maxBackoff = Duration(minutes: 15);
 
+  /// Singleton accesible desde toda la app (se setea en open()).
+  static late OutboxService instance;
+
   final Box _box;
   final ValueNotifier<bool> isSyncing = ValueNotifier<bool>(false);
 
   StreamSubscription<List<ConnectivityResult>>? _connSub;
 
   /// Abrir/crear la box y comenzar a observar conectividad
-  static Future<OutboxService> open(
-      {bool autoFlushOnConnectivity = true}) async {
+  static Future<OutboxService> open({bool autoFlushOnConnectivity = true}) async {
     final box = await Hive.openBox(_boxName);
     final svc = OutboxService(box);
+    instance = svc; // <-- singleton
     if (autoFlushOnConnectivity) {
       svc._watchConnectivity(); // no hace falta await
     }
@@ -81,15 +84,13 @@ class OutboxService {
 
   Future<void> dispose() async {
     await _connSub?.cancel();
-    isSyncing.dispose(); // NO se await-ea (devuelve void)
+    isSyncing.dispose();
   }
 
   void _watchConnectivity() {
     _connSub?.cancel();
     _connSub = Connectivity().onConnectivityChanged.listen((results) {
-      // v6 puede emitir múltiples resultados; si no está NONE, hay conectividad.
-      final online =
-          results.isNotEmpty && !results.contains(ConnectivityResult.none);
+      final online = results.isNotEmpty && !results.contains(ConnectivityResult.none);
       if (online) {
         unawaited(flush());
       }
@@ -154,7 +155,6 @@ class OutboxService {
           continue; // tope de reintentos
         }
 
-        // Backoff exponencial con cap
         final wait = _backoffFor(item.attempts);
         if (item.lastTryAt != null && now.difference(item.lastTryAt!) < wait) {
           continue;
@@ -206,6 +206,5 @@ class OutboxService {
     final cap = _maxBackoff.inSeconds;
     if (seconds > cap) seconds = cap;
     return Duration(seconds: seconds);
-    // Secuencia: 15s, 30s, 60s, 2m, 4m, 8m, 15m...
   }
 }

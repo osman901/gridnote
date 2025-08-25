@@ -1,151 +1,100 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-enum GridnotePalette { lightCeleste, darkNegroGris }
 
 class GridnoteTheme {
-  final Color scaffold;
-  final Color surface;
-  final Color surfaceAlt;
-  final Color text;
-  final Color textFaint;
-  final Color divider;
-  final Color accent;
-
   const GridnoteTheme({
     required this.scaffold,
     required this.surface,
-    required this.surfaceAlt,
     required this.text,
     required this.textFaint,
-    required this.divider,
     required this.accent,
+    required this.divider,
   });
 
-  static GridnoteTheme of(GridnotePalette p) {
-    switch (p) {
-      case GridnotePalette.lightCeleste:
-        return const GridnoteTheme(
-          scaffold: Colors.white,
-          surface: Color(0xFFF6F9FF),
-          surfaceAlt: Color(0xFFEEF5FF),
-          text: Color(0xFF0F172A),
-          textFaint: Color(0xFF475569),
-          divider: Color(0xFFE2E8F0),
-          accent: Color(0xFF0EA5E9),
-        );
-      case GridnotePalette.darkNegroGris:
-        return const GridnoteTheme(
-          scaffold: Color(0xFF0B0B0C),
-          surface: Color(0xFF121316),
-          surfaceAlt: Color(0xFF1A1C20),
-          text: Colors.white,
-          textFaint: Color(0xFFCBD5E1),
-          divider: Color(0xFF2A2D32),
-          accent: Colors.white,
-        );
-    }
-  }
+  final Color scaffold;
+  final Color surface;
+  final Color text;
+  final Color textFaint;
+  final Color accent;
+  final Color divider;
 
-  ThemeData toThemeData() {
-    final isDark = scaffold.computeLuminance() < 0.5;
-    final base = isDark
-        ? ThemeData.dark(useMaterial3: true)
-        : ThemeData.light(useMaterial3: true);
+  factory GridnoteTheme.light() => const GridnoteTheme(
+    scaffold: Color(0xFFF7F7F7),
+    surface: Color(0xFFFFFFFF),
+    text: Color(0xFF1F2428),
+    textFaint: Color(0x991F2428),
+    accent: Color(0xFF2962FF),
+    divider: Color(0x1F000000),
+  );
 
-    // Evitamos 'background' y 'onBackground' (deprecados) usando copyWith.
-    final scheme =
-        (isDark ? const ColorScheme.dark() : const ColorScheme.light())
-            .copyWith(
-      primary: accent,
-      onPrimary: isDark ? Colors.black : Colors.white,
-      secondary: accent,
-      onSecondary: isDark ? Colors.black : Colors.white,
-      error: isDark ? Colors.red.shade200 : Colors.red.shade700,
-      onError: isDark ? Colors.black : Colors.white,
-      surface: surface,
-      onSurface: text,
-    );
+  /// DARK + GREEN (fondo negro más intenso, texto claro, rejas verdes)
+  factory GridnoteTheme.dark() => const GridnoteTheme(
+    scaffold: Color(0xFF070908), // más negro
+    surface:  Color(0xFF0B0E0C), // panel
+    text:     Color(0xFFECEFEA),
+    textFaint:Color(0x99ECEFEA),
+    accent:   Color(0xFF00E676), // verde principal
+    divider:  Color(0x3300E676), // rejas verdes sutiles
+  );
 
-    return base.copyWith(
-      colorScheme: scheme,
-      scaffoldBackgroundColor: scaffold,
-      dividerColor: divider,
-      textTheme: base.textTheme.apply(bodyColor: text, displayColor: text),
-      appBarTheme: AppBarTheme(
-        backgroundColor: surface,
-        foregroundColor: text,
-        elevation: 0.5,
-      ),
-      cardTheme: CardThemeData(
-        color: surface,
-        elevation: 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: divider),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surfaceAlt,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: divider),
-        ),
-      ),
-    );
-  }
+  GridnoteTheme copyWith({
+    Color? scaffold,
+    Color? surface,
+    Color? text,
+    Color? textFaint,
+    Color? accent,
+    Color? divider,
+  }) =>
+      GridnoteTheme(
+        scaffold: scaffold ?? this.scaffold,
+        surface: surface ?? this.surface,
+        text: text ?? this.text,
+        textFaint: textFaint ?? this.textFaint,
+        accent: accent ?? this.accent,
+        divider: divider ?? this.divider,
+      );
 }
 
 class GridnoteThemeController extends ChangeNotifier {
-  static const _kKey = 'gridnote_palette';
-  GridnotePalette _palette = GridnotePalette.lightCeleste;
-  GridnotePalette get palette => _palette;
-  GridnoteTheme get theme => GridnoteTheme.of(_palette);
+  GridnoteThemeController({GridnoteTheme? initial})
+      : _theme = initial ?? GridnoteTheme.dark(); // por defecto dark+green
+  GridnoteTheme _theme;
+  GridnoteTheme get theme => _theme;
 
-  Future<void> load() async {
-    final sp = await SharedPreferences.getInstance();
-    final idx = sp.getInt(_kKey);
-    if (idx != null && idx >= 0 && idx < GridnotePalette.values.length) {
-      _palette = GridnotePalette.values[idx];
-      notifyListeners();
-    }
-  }
-
-  Future<void> set(GridnotePalette p) async {
-    _palette = p;
+  void setTheme(GridnoteTheme t) { _theme = t; notifyListeners(); }
+  void toggleDark() {
+    final isDark = _theme.scaffold.computeLuminance() < 0.5;
+    _theme = isDark ? GridnoteTheme.light() : GridnoteTheme.dark();
     notifyListeners();
-    final sp = await SharedPreferences.getInstance();
-    await sp.setInt(_kKey, p.index);
   }
 }
 
+/// Paleta específica para la tabla
 class GridnoteTableStyle {
-  final Color headerBg;
-  final Color headerText;
-  final Color cellBg;
-  final Color cellBgAlt;
-  final Color cellText;
-  final Color gridLine;
-
-  GridnoteTableStyle({
+  const GridnoteTableStyle({
+    required this.gridLine,
+    required this.cellBg,
+    required this.altCellBg,
     required this.headerBg,
     required this.headerText,
-    required this.cellBg,
-    required this.cellBgAlt,
-    required this.cellText,
-    required this.gridLine,
+    required this.selection,
+    required this.fontFamily,
   });
 
-  factory GridnoteTableStyle.from(GridnoteTheme t) {
-    final isDark = t.scaffold.computeLuminance() < 0.5;
-    return GridnoteTableStyle(
-      headerBg: isDark ? t.surfaceAlt : t.surface,
-      headerText: t.text,
-      cellBg: t.surface,
-      cellBgAlt: t.surfaceAlt,
-      cellText: t.text,
-      gridLine: t.divider,
-    );
-  }
+  final Color gridLine;   // rejas
+  final Color cellBg;
+  final Color altCellBg;
+  final Color headerBg;
+  final Color headerText;
+  final Color selection;  // foco/selección
+  final String fontFamily;
+
+  factory GridnoteTableStyle.from(GridnoteTheme t) => GridnoteTableStyle(
+    gridLine: t.divider,
+    cellBg: t.surface,
+    altCellBg: t.surface.withValues(alpha: 0.94),
+    headerBg: const Color(0xFF102015), // verde muy oscuro
+    headerText: t.text,
+    selection: t.accent,
+    fontFamily: 'Arimo',
+  );
 }

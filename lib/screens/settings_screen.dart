@@ -16,19 +16,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _loading = true;
   late final SettingsService _settings;
+  ChangeNotifier? _maybeNotifier;
 
   @override
   void initState() {
     super.initState();
     _settings = SettingsService.instance;
-    // (Opcional) Reacciona a cambios externos si SettingsService extiende ChangeNotifier
-    (_settings as ChangeNotifier).addListener(_onServiceChanged);
-      _load();
+    // Listener solo si el servicio implementa ChangeNotifier
+    if (_settings is ChangeNotifier) {
+      _maybeNotifier = _settings as ChangeNotifier;
+      _maybeNotifier!.addListener(_onServiceChanged);
+    }
+    _load();
   }
 
   void _onServiceChanged() {
     if (!mounted) return;
-    // Relee valores ante cambios externos
     _load();
   }
 
@@ -45,15 +48,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    (_settings as ChangeNotifier).removeListener(_onServiceChanged);
-      _endpointCtl.dispose();
+    _maybeNotifier?.removeListener(_onServiceChanged);
+    _endpointCtl.dispose();
     _emailCtl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     final endpoint = _endpointCtl.text.trim();
     final email = _emailCtl.text.trim();
 
@@ -63,15 +65,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       defaultEmail: email.isEmpty ? null : email,
     );
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Preferencias guardadas')),
     );
-    Navigator.pop(context); // cierra la pantalla tras guardar
+    Navigator.pop(context);
   }
 
   Future<void> _clear() async {
-    // Confirmación antes de acción destructiva
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -80,18 +80,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           '¿Borrar todas las configuraciones? Esta acción no se puede deshacer.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Borrar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Borrar')),
         ],
       ),
     );
-
     if (confirmed != true) return;
 
     setState(() => _loading = true);
@@ -100,7 +93,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _endpointCtl.clear();
     _emailCtl.clear();
     setState(() => _loading = false);
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Configuraciones borradas')),
     );
@@ -110,21 +102,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Configuración')),
+        appBar: AppBar(title: const Text('Ajustes')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuración')),
+      appBar: AppBar(title: const Text('Ajustes')),
       body: Form(
         key: _formKey,
         child: ListView(
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Envío rápido',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              child: Text('Envío rápido', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
 
             // ENDPOINT (opcional)
@@ -138,6 +129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.url],
                 validator: (v) {
                   final s = (v ?? '').trim();
                   if (s.isEmpty) return null;
@@ -157,6 +150,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.email],
+                onFieldSubmitted: (_) => _save(),
                 validator: (v) {
                   final s = (v ?? '').trim();
                   if (s.isEmpty) return null;
@@ -169,15 +165,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
                 '• Si hay endpoint, los Excel se envían por HTTP.\n'
-                '• Si no hay endpoint y hay email, se abre el envío por correo.\n'
-                '• Ambos campos son opcionales; usa el que prefieras.',
+                    '• Si no hay endpoint y hay email, se abre el envío por correo.\n'
+                    '• Ambos campos son opcionales; usa el que prefieras.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ),
 
             const SizedBox(height: 12),
 
-            // Botones (deshabilitados mientras _loading para evitar carreras)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(

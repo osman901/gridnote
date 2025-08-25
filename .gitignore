@@ -28,3 +28,5 @@ linux/flutter/ephemeral/
 # Keystores
 *.jks
 *.keystore
+
+android_bak/

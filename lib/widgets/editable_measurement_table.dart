@@ -1,3 +1,4 @@
+// lib/widgets/editable_measurement_table.dart
 import 'package:flutter/material.dart';
 import '../models/measurement.dart';
 
@@ -55,8 +56,8 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
     for (final m in widget.measurements) {
       _controllers.add({
         'progresiva': TextEditingController(text: m.progresiva),
-        'ohm1m': TextEditingController(text: m.ohm1m.toString()),
-        'ohm3m': TextEditingController(text: m.ohm3m.toString()),
+        'ohm1m': TextEditingController(text: m.ohm1m?.toString() ?? ''),
+        'ohm3m': TextEditingController(text: m.ohm3m?.toString() ?? ''),
         'observations': TextEditingController(text: m.observations),
         'latitude': TextEditingController(text: m.latitude?.toString() ?? ''),
         'longitude': TextEditingController(text: m.longitude?.toString() ?? ''),
@@ -76,8 +77,8 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
     // 2) Nueva medición
     final newM = updated[i].copyWith(
       progresiva: ctrl['progresiva']!.text,
-      ohm1m: double.tryParse(ctrl['ohm1m']!.text.replaceAll(',', '.')) ?? 0,
-      ohm3m: double.tryParse(ctrl['ohm3m']!.text.replaceAll(',', '.')) ?? 0,
+      ohm1m: double.tryParse(ctrl['ohm1m']!.text.replaceAll(',', '.')),
+      ohm3m: double.tryParse(ctrl['ohm3m']!.text.replaceAll(',', '.')),
       observations: ctrl['observations']!.text,
       latitude: double.tryParse(ctrl['latitude']!.text.replaceAll(',', '.')),
       longitude: double.tryParse(ctrl['longitude']!.text.replaceAll(',', '.')),
@@ -104,18 +105,24 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
       decoration: BoxDecoration(
         color: Colors.cyan[900],
         border: const Border(
-            bottom: BorderSide(color: Colors.cyanAccent, width: 2.5)),
+          bottom: BorderSide(color: Colors.cyanAccent, width: 2.5),
+        ),
       ),
       children: headers
-          .map((h) => Padding(
-                padding: const EdgeInsets.all(10),
-                child: Text(h,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 15,
-                        letterSpacing: 0.5)),
-              ))
+          .map(
+            (h) => Padding(
+          padding: const EdgeInsets.all(10),
+          child: Text(
+            h,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 15,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      )
           .toList(),
     );
   }
@@ -124,7 +131,7 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
     final ctrl = _controllers[i];
     return TableRow(
       decoration:
-          BoxDecoration(color: i % 2 == 0 ? Colors.grey[850] : Colors.black),
+      BoxDecoration(color: i % 2 == 0 ? Colors.grey[850] : Colors.black),
       children: [
         _cell(ctrl['progresiva']!, onSaved: () => _saveRow(i)),
         _cell(ctrl['ohm1m']!, onSaved: () => _saveRow(i), numeric: true),
@@ -134,15 +141,20 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
         _cell(ctrl['longitude']!, onSaved: () => _saveRow(i), numeric: true),
         Padding(
           padding: const EdgeInsets.all(8),
-          child: Text(m.dateString,
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          child: Text(
+            m.dateString,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
         ),
       ],
     );
   }
 
-  Widget _cell(TextEditingController controller,
-      {bool numeric = false, required VoidCallback onSaved}) {
+  Widget _cell(
+      TextEditingController controller, {
+        bool numeric = false,
+        required VoidCallback onSaved,
+      }) {
     return Padding(
       padding: const EdgeInsets.all(4),
       child: Focus(
@@ -159,7 +171,7 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
           decoration: InputDecoration(
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(vertical: 9, horizontal: 9),
+            const EdgeInsets.symmetric(vertical: 9, horizontal: 9),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Colors.cyanAccent, width: 1),

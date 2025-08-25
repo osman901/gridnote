@@ -1,8 +1,11 @@
 // lib/screens/exported_files_screen.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../services/file_scanner.dart';
 
 class ExportedFilesScreen extends StatefulWidget {
@@ -54,53 +57,53 @@ class _ExportedFilesScreenState extends State<ExportedFilesScreen> {
               final it = items[i];
               final isPdf = it.ext == '.pdf';
               return ListTile(
-                leading: Icon(
-                  isPdf ? Icons.picture_as_pdf : Icons.grid_on,
-                ),
+                leading: Icon(isPdf ? Icons.picture_as_pdf : Icons.grid_on),
                 title: Text(it.name, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   '${fmt.format(it.modified)} • ${formatSize(it.sizeBytes)} • ${it.origin}',
                 ),
-                onTap: () => OpenFile.open(it.file.path),
+                onTap: () => OpenFilex.open(it.file.path),
                 trailing: PopupMenuButton<String>(
                   onSelected: (v) async {
                     switch (v) {
                       case 'open':
-                        await OpenFile.open(it.file.path);
+                        await OpenFilex.open(it.file.path);
                         break;
                       case 'share':
                         await Share.shareXFiles([XFile(it.file.path)]);
                         break;
                       case 'delete':
                         final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('Eliminar archivo'),
-                                content: Text('¿Eliminar “${it.name}”?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancelar'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Eliminar'),
-                                  ),
-                                ],
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Eliminar archivo'),
+                            content: Text('¿Eliminar “${it.name}”?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, false),
+                                child: const Text('Cancelar'),
                               ),
-                            ) ??
+                              FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, true),
+                                child: const Text('Eliminar'),
+                              ),
+                            ],
+                          ),
+                        ) ??
                             false;
                         if (!ok) return;
                         try {
                           await it.file.delete();
-                          if (mounted) _refresh();
-                        } catch (_) {
                           if (!mounted) return;
+                          _refresh();
+                        } catch (_) {
+                          if (!context.mounted) return; // ✔️ no usar context tras await sin chequear
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text('No se pudo eliminar.')),
+                              content: Text('No se pudo eliminar.'),
+                            ),
                           );
                         }
                         break;

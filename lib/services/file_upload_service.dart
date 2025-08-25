@@ -1,100 +1,89 @@
 // lib/services/file_upload_service.dart
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart' as fs;
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
+/// Stub local que reemplaza a Firebase Storage.
+/// Guarda archivos bajo <Documents>/uploads/<folder>/ y devuelve una URL file://
 class FileUploadService {
-  final fs.FirebaseStorage _storage;
+  const FileUploadService();
 
-  FileUploadService({fs.FirebaseStorage? storage})
-      : _storage = storage ?? fs.FirebaseStorage.instance;
-
-  /// Sube bytes al bucket en la carpeta "reports/" y devuelve la URL de descarga.
-  /// [filename] se saneará y se le antepone un timestamp para evitar colisiones.
+  /// Guarda [bytes] como archivo local y devuelve una URL file://
   Future<String> uploadReportBytes({
     required Uint8List bytes,
     required String filename,
-    String? contentType,
+    String? contentType, // ignorado en stub local
   }) async {
     final objectPath = _objectPath('reports', filename);
-    final ref = _storage.ref(objectPath);
-
-    final meta = fs.SettableMetadata(
-      contentType: contentType ?? _mimeFor(filename),
-      cacheControl: 'public, max-age=3600',
-    );
-
-    // putData devuelve UploadTask; al await obtenemos TaskSnapshot
-    final snap = await ref.putData(bytes, meta);
-    final url = await snap.ref.getDownloadURL();
-    return url;
+    final file = await _writeBytes(objectPath, bytes);
+    return Uri.file(file.path).toString();
   }
 
-  /// Versión para archivos locales (Android/iOS/desktop).
+  /// Copia un archivo local a la carpeta de uploads y devuelve una URL file://
   Future<String> uploadReportFile({
     required File file,
     String folder = 'reports',
   }) async {
-    final filename = p.basename(file.path);
-    final objectPath = _objectPath(folder, filename);
-    final ref = _storage.ref(objectPath);
-
-    final meta = fs.SettableMetadata(
-      contentType: _mimeFor(filename),
-      cacheControl: 'public, max-age=3600',
-    );
-
-    final snap = await ref.putFile(file, meta);
-    final url = await snap.ref.getDownloadURL();
-    return url;
+    final objectPath = _objectPath(folder, p.basename(file.path));
+    final target = await _destFile(objectPath);
+    await target.parent.create(recursive: true);
+    await file.copy(target.path);
+    return Uri.file(target.path).toString();
   }
 
-  /// Elimina un objeto por su path dentro del bucket (ej: 'reports/1234-file.xlsx').
+  /// Elimina por ruta de objeto (relativa o absoluta).
   Future<void> deleteByPath(String objectPath) async {
-    await _storage.ref(objectPath).delete();
+    final file = await _fileFromObjectPath(objectPath);
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
-  /// Si tenés una URL pública de descarga, intenta derivar el path del objeto.
-  /// (Funciona con URLs de Firebase Storage estándar.)
+  /// Elimina a partir de una URL file://
   Future<void> deleteByDownloadUrl(String downloadUrl) async {
     final uri = Uri.parse(downloadUrl);
-    final segments = uri.pathSegments;
-    // Busca el segmento después de 'o', que es la ruta encodeada del objeto
-    final idx = segments.indexOf('o');
-    if (idx != -1 && idx + 1 < segments.length) {
-      final encoded = segments[idx + 1];
-      final objectPath = Uri.decodeFull(encoded);
-      await deleteByPath(objectPath);
-    } else {
-      throw ArgumentError('URL de descarga no reconocida');
+    if (uri.scheme != 'file') {
+      throw ArgumentError('Solo se soportan URLs file:// en el stub local.');
+    }
+    final path = uri.toFilePath();
+    final f = File(path);
+    if (await f.exists()) {
+      await f.delete();
     }
   }
 
   // ----------------- Helpers -----------------
 
-  String _objectPath(String folder, String filename) {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final safeName = filename.replaceAll(RegExp(r'[^\w\-. ]+'), '_');
-    return '$folder/$ts-$safeName';
-    // Ej: reports/1712800000000-Planilla_1.xlsx
+  Future<Directory> _baseDir() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final base = Directory(p.join(docs.path, 'uploads'));
+    if (!await base.exists()) await base.create(recursive: true);
+    return base;
   }
 
-  String _mimeFor(String filename) {
-    switch (p.extension(filename).toLowerCase()) {
-      case '.pdf':
-        return 'application/pdf';
-      case '.xlsx':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case '.csv':
-        return 'text/csv';
-      case '.png':
-        return 'image/png';
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      default:
-        return 'application/octet-stream';
-    }
+  String _objectPath(String folder, String filename) {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final safe = filename.replaceAll(RegExp(r'[^\w\-. ]+'), '_');
+    return p.join(folder, '$ts-$safe');
+  }
+
+  Future<File> _destFile(String objectPath) async {
+    final base = await _baseDir();
+    return File(p.join(base.path, objectPath));
+  }
+
+  Future<File> _writeBytes(String objectPath, Uint8List bytes) async {
+    final file = await _destFile(objectPath);
+    await file.parent.create(recursive: true);
+    return file.writeAsBytes(bytes, flush: true);
+  }
+
+  Future<File> _fileFromObjectPath(String objectPath) async {
+    // Si viene absoluta, úsala; si no, la resolvemos bajo /uploads
+    final f = File(objectPath);
+    if (p.isAbsolute(objectPath)) return f;
+    final base = await _baseDir();
+    return File(p.join(base.path, objectPath));
   }
 }

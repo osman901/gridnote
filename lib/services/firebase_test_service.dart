@@ -1,17 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// lib/services/firebase_test_service.dart
+import 'package:flutter/foundation.dart';
 
 class FirebaseTestService {
-  // Intenta escribir y leer un documento de prueba
+  /// Stub: Firebase deshabilitado. Siempre devuelve false.
   static Future<bool> testConnection() async {
-    try {
-      final docRef =
-          FirebaseFirestore.instance.collection('test_connection').doc('ping');
-      await docRef.set({'timestamp': DateTime.now().toIso8601String()});
-      final snapshot = await docRef.get();
-      return snapshot.exists;
-    } catch (e) {
-      print('Error test firebase: $e');
-      return false;
+    if (kDebugMode) {
+      debugPrint('FirebaseTestService: Firebase está deshabilitado (stub).');
     }
+    return false;
   }
 }

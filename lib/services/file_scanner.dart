@@ -1,4 +1,3 @@
-// lib/services/file_scanner.dart
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -48,10 +47,10 @@ Future<List<FileInfo>> scanReports() async {
       final origin = path.startsWith(reportsDir.path)
           ? 'Historial'
           : path.startsWith(docs.path)
-              ? 'Documents'
-              : path.startsWith(temp.path)
-                  ? 'Temp'
-                  : '—';
+          ? 'Documents'
+          : path.startsWith(temp.path)
+          ? 'Temp'
+          : '—';
 
       out.add(FileInfo(
         file: e,

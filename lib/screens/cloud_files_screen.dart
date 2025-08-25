@@ -1,9 +1,12 @@
+// lib/screens/cloud_files_screen.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/firebase_test_service.dart'; // <--- IMPORTANTE
 
+/// Pantalla de “Planillas en la Nube” SIN Firebase.
+/// Esta versión no depende de `cloud_firestore`.
+/// Muestra un placeholder y mantiene el diseño para que puedas
+/// enchufar tu backend cuando quieras.
 class CloudFilesScreen extends StatefulWidget {
   const CloudFilesScreen({super.key});
 
@@ -15,15 +18,27 @@ class _CloudFilesScreenState extends State<CloudFilesScreen> {
   String _search = '';
   String _filtroFecha = 'Todos';
 
-  // Helper para filtrar por fecha
+  // (Opcional) lista mock para probar el UI localmente.
+  // Podés reemplazarla por datos reales de tu backend.
+  final List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[
+    // {
+    //   'nombre': 'Planilla ejemplo',
+    //   'fecha': '2025-03-25T10:30:00.000Z',
+    //   'latitud': -34.6037,
+    //   'longitud': -58.3816,
+    //   'mediciones': [
+    //     {'progresiva': '1', 'ohm1m': 0.11, 'ohm3m': 0.12, 'observaciones': 'A'},
+    //     {'progresiva': '2', 'ohm1m': 0.15, 'ohm3m': 0.20, 'observaciones': 'B'},
+    //   ],
+    // },
+  ];
+
   bool _matchFiltroFecha(String fechaIso) {
     if (_filtroFecha == 'Todos') return true;
     final fecha = DateTime.tryParse(fechaIso) ?? DateTime.now();
     final hoy = DateTime.now();
     if (_filtroFecha == 'Hoy') {
-      return fecha.year == hoy.year &&
-          fecha.month == hoy.month &&
-          fecha.day == hoy.day;
+      return fecha.year == hoy.year && fecha.month == hoy.month && fecha.day == hoy.day;
     }
     if (_filtroFecha == 'Semana') {
       final inicioSemana = hoy.subtract(Duration(days: hoy.weekday - 1));
@@ -37,34 +52,44 @@ class _CloudFilesScreenState extends State<CloudFilesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _items.where((planilla) {
+      final nombre = (planilla['nombre'] ?? '').toString().toLowerCase();
+      final fecha = (planilla['fecha'] ?? '').toString();
+      final matchesSearch = _search.isEmpty || nombre.contains(_search.toLowerCase());
+      final matchesFecha = _matchFiltroFecha(fecha);
+      return matchesSearch && matchesFecha;
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Planillas en la Nube'),
-        backgroundColor: Colors.cyan[900],
+        title: const Text('Planillas en la Nube (sin configurar)'),
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) => setState(() => _filtroFecha = v),
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'Todos', child: Text('Todos')),
-              const PopupMenuItem(value: 'Hoy', child: Text('Hoy')),
-              const PopupMenuItem(value: 'Semana', child: Text('Esta semana')),
-              const PopupMenuItem(value: 'Mes', child: Text('Este mes')),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'Todos', child: Text('Todos')),
+              PopupMenuItem(value: 'Hoy', child: Text('Hoy')),
+              PopupMenuItem(value: 'Semana', child: Text('Esta semana')),
+              PopupMenuItem(value: 'Mes', child: Text('Este mes')),
             ],
             icon: const Icon(Icons.filter_alt),
-            tooltip: "Filtrar por fecha",
+            tooltip: 'Filtrar por fecha',
           ),
           IconButton(
-            icon: const Icon(Icons.wifi_tethering),
-            tooltip: 'Test conexión Firebase',
+            tooltip: 'Cómo habilitar la nube',
+            icon: const Icon(Icons.help_outline),
             onPressed: () async {
-              final ok = await FirebaseTestService.testConnection();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                      ? 'Conexión a Firebase OK 🔥'
-                      : 'Error de conexión Firebase'),
-                ),
-              );
+              const url = 'https://firebase.google.com/docs/flutter/setup?hl=es-419';
+              final uri = Uri.parse(url);
+              if (!await canLaunchUrl(uri)) return;
+              // No uses `context` después de `await` sin chequear `mounted`.
+              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!mounted) return;
+              if (!ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No se pudo abrir la ayuda.')),
+                );
+              }
             },
           ),
         ],
@@ -78,139 +103,85 @@ class _CloudFilesScreenState extends State<CloudFilesScreen> {
               decoration: InputDecoration(
                 hintText: 'Buscar por nombre',
                 prefixIcon: const Icon(Icons.search),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onChanged: (v) => setState(() => _search = v.trim()),
             ),
           ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('planillas')
-                  .orderBy('fecha', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = snapshot.data!.docs.where((doc) {
-                  final planilla = doc.data() as Map<String, dynamic>;
-                  final nombre =
-                      planilla['nombre']?.toString().toLowerCase() ?? '';
-                  final fecha = planilla['fecha'] ?? '';
-                  final matchesSearch =
-                      _search.isEmpty || nombre.contains(_search.toLowerCase());
-                  final matchesFecha = _matchFiltroFecha(fecha);
-                  return matchesSearch && matchesFecha;
-                }).toList();
 
-                if (docs.isEmpty) {
-                  return const Center(
-                      child: Text('No hay planillas que coincidan.'));
-                }
-
-                return ListView.builder(
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final planilla = docs[index].data() as Map<String, dynamic>;
-                    final id = docs[index].id;
-                    final nombre = planilla['nombre'] ?? 'Sin nombre';
-                    final fecha = planilla['fecha'] ?? '';
-                    final fechaFormat = fecha.isNotEmpty
-                        ? DateFormat('dd/MM/yyyy HH:mm')
-                            .format(DateTime.tryParse(fecha) ?? DateTime.now())
-                        : '-';
-                    final lat = planilla['latitud'];
-                    final lon = planilla['longitud'];
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        leading:
-                            const Icon(Icons.cloud_done, color: Colors.cyan),
-                        title: Text(nombre,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Fecha: $fechaFormat'),
-                            if (lat != null && lon != null)
-                              GestureDetector(
-                                onTap: () async {
-                                  final url =
-                                      'https://www.google.com/maps/search/?api=1&query=$lat,$lon';
-                                  if (await canLaunchUrl(Uri.parse(url))) {
-                                    await launchUrl(Uri.parse(url),
-                                        mode: LaunchMode.externalApplication);
-                                  }
-                                },
-                                child: Text(
-                                  'Ubicación: $lat, $lon',
-                                  style: const TextStyle(
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.underline),
+          if (_items.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Aún no hay un backend de nube configurado.\n'
+                        'Podés agregar Firebase/Firestore o tu propia API más adelante.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final planilla = filtered[index];
+                  final nombre = planilla['nombre'] ?? 'Sin nombre';
+                  final fecha = (planilla['fecha'] ?? '').toString();
+                  final fechaFormat = fecha.isNotEmpty
+                      ? DateFormat('dd/MM/yyyy HH:mm')
+                      .format(DateTime.tryParse(fecha) ?? DateTime.now())
+                      : '-';
+                  final lat = planilla['latitud'];
+                  final lon = planilla['longitud'];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: ListTile(
+                      leading: const Icon(Icons.cloud_off, color: Colors.grey),
+                      title: Text(nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Fecha: $fechaFormat'),
+                          if (lat != null && lon != null)
+                            GestureDetector(
+                              onTap: () async {
+                                final url =
+                                    'https://www.google.com/maps/search/?api=1&query=$lat,$lon';
+                                final uri = Uri.parse(url);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                              child: const Text(
+                                'Abrir ubicación',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  decoration: TextDecoration.underline,
                                 ),
                               ),
-                            Text(
-                                'Mediciones: ${planilla['mediciones']?.length ?? 0}'),
-                          ],
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'ver') {
-                              _mostrarDetalles(context, planilla);
-                            } else if (value == 'borrar') {
-                              final ok = await showDialog<bool>(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text('¿Eliminar planilla?'),
-                                  content: const Text(
-                                      'Esta acción no se puede deshacer.'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const Text('Cancelar')),
-                                    TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const Text('Eliminar',
-                                            style:
-                                                TextStyle(color: Colors.red))),
-                                  ],
-                                ),
-                              );
-                              if (ok == true) {
-                                await FirebaseFirestore.instance
-                                    .collection('planillas')
-                                    .doc(id)
-                                    .delete();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('Planilla eliminada')));
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                                value: 'ver', child: Text('Ver detalles')),
-                            const PopupMenuItem(
-                                value: 'borrar',
-                                child: Text('Eliminar',
-                                    style: TextStyle(color: Colors.red))),
-                          ],
-                        ),
-                        onTap: () => _mostrarDetalles(context, planilla),
+                            ),
+                          Text('Mediciones: ${(planilla['mediciones'] as List?)?.length ?? 0}'),
+                        ],
                       ),
-                    );
-                  },
-                );
-              },
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'ver') {
+                            _mostrarDetalles(context, planilla);
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'ver', child: Text('Ver detalles')),
+                        ],
+                      ),
+                      onTap: () => _mostrarDetalles(context, planilla),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -218,29 +189,26 @@ class _CloudFilesScreenState extends State<CloudFilesScreen> {
 
   // ---------- DIALOGO DETALLES EN TABLA -----------------
   void _mostrarDetalles(BuildContext context, Map<String, dynamic> planilla) {
-    final mediciones = planilla['mediciones'] as List<dynamic>? ?? [];
-    showDialog(
+    final mediciones = planilla['mediciones'] as List<dynamic>? ?? const [];
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(planilla['nombre'] ?? 'Sin nombre'),
+        title: Text(planilla['nombre']?.toString() ?? 'Sin nombre'),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Fecha: ${planilla['fecha'] ?? ''}'),
-              Text(
-                  'Ubicación: ${planilla['latitud']} / ${planilla['longitud']}'),
+              Text('Ubicación: ${planilla['latitud']} / ${planilla['longitud']}'),
               const SizedBox(height: 8),
-              const Text('Mediciones:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Mediciones:', style: TextStyle(fontWeight: FontWeight.bold)),
               MeasurementTableDialog(mediciones: mediciones),
             ],
           ),
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
         ],
       ),
     );
@@ -249,9 +217,8 @@ class _CloudFilesScreenState extends State<CloudFilesScreen> {
 
 // ---------- TABLA DETALLE MEDICIONES ----------
 class MeasurementTableDialog extends StatelessWidget {
-  final List<dynamic> mediciones;
-
   const MeasurementTableDialog({super.key, required this.mediciones});
+  final List<dynamic> mediciones;
 
   @override
   Widget build(BuildContext context) {
@@ -263,17 +230,13 @@ class MeasurementTableDialog extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columns: headers
-            .map((h) => DataColumn(label: Text(h.toString().toUpperCase())))
-            .toList(),
+        columns: headers.map((h) => DataColumn(label: Text(h.toString().toUpperCase()))).toList(),
         rows: mediciones
             .map(
               (m) => DataRow(
-                cells: headers
-                    .map((h) => DataCell(Text('${m[h] ?? ''}')))
-                    .toList(),
-              ),
-            )
+            cells: headers.map((h) => DataCell(Text('${m[h] ?? ''}'))).toList(),
+          ),
+        )
             .toList(),
       ),
     );

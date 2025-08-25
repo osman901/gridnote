@@ -43,8 +43,8 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     final m = widget.initial ?? Measurement.empty();
 
     _progCtrl = TextEditingController(text: m.progresiva);
-    _ohm1Ctrl = TextEditingController(text: m.ohm1m.toString() ?? '');
-    _ohm3Ctrl = TextEditingController(text: m.ohm3m.toString() ?? '');
+    _ohm1Ctrl = TextEditingController(text: m.ohm1m?.toString() ?? '');
+    _ohm3Ctrl = TextEditingController(text: m.ohm3m?.toString() ?? '');
     _obsCtrl = TextEditingController(text: m.observations);
     _latCtrl = TextEditingController(text: m.latitude?.toString() ?? '');
     _lonCtrl = TextEditingController(text: m.longitude?.toString() ?? '');
@@ -135,13 +135,13 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                 controller: _progCtrl,
                 decoration: const InputDecoration(labelText: 'Progresiva'),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                (v == null || v.trim().isEmpty) ? 'Requerido' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _ohm1Ctrl,
                 keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [_posDecimalFormatter],
                 decoration: const InputDecoration(labelText: 'Ohm 1m'),
                 validator: (v) => numValidator(v, allowEmpty: true),
@@ -150,7 +150,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
               TextFormField(
                 controller: _ohm3Ctrl,
                 keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [_posDecimalFormatter],
                 decoration: const InputDecoration(labelText: 'Ohm 3m'),
                 validator: (v) => numValidator(v, allowEmpty: true),

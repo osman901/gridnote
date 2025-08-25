@@ -1,121 +1,91 @@
 // lib/services/excel_template_service.dart
 import 'dart:io';
-import 'package:path/path.dart' as p;
+import 'package:excel/excel.dart' as ex;
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart';
-import '../models/measurement.dart';
 
+/// Servicio simple de “plantilla” en memoria + exportación a XLSX usando package:excel ^4.x
 class ExcelTemplateService {
-  late Workbook _wb;
+  final Map<String, List<List<String>>> _sheets = <String, List<List<String>>>{};
 
-  /// Crea el workbook y agrega hojas por nombre.
-  Future<void> load({List<String> sheetNames = const ['Hoja1']}) async {
-    _wb = Workbook();
-    _wb.worksheets[0].name = sheetNames.first;
-    for (int i = 1; i < sheetNames.length; i++) {
-      _wb.worksheets.addWithName(sheetNames[i]);
-    }
-  }
-
-  List<String> get sheets => List.generate(
-        _wb.worksheets.count,
-        (i) => _wb.worksheets[i].name,
+  /// Crea en memoria las hojas indicadas si no existen.
+  Future<void> load({required List<String> sheetNames}) async {
+    for (final name in sheetNames) {
+      _sheets.putIfAbsent(
+        name,
+            () => List.generate(12, (_) => List.filled(4, ''), growable: true),
       );
-
-  Worksheet _sheetByName(String name) {
-    for (var i = 0; i < _wb.worksheets.count; i++) {
-      final ws = _wb.worksheets[i];
-      if (ws.name == name) return ws;
     }
-    throw ArgumentError('Hoja no encontrada: $name');
   }
 
-  /// Devuelve una matriz de textos de la hoja.
-  List<List<String>> matrix(String sheetName) {
-    final ws = _sheetByName(sheetName);
-    final rows = ws.getLastRow();
-    final cols = ws.getLastColumn();
-    if (rows <= 0 || cols <= 0) return const [];
+  /// Devuelve la matriz (lista de filas; cada fila es lista de celdas String).
+  List<List<String>> matrix(String sheetName) =>
+      _sheets[sheetName] ?? const <List<String>>[];
 
-    return List.generate(rows, (r) {
-      return List.generate(cols, (c) {
-        final String text = ws.getRangeByIndex(r + 1, c + 1).displayText;
-        return text; // displayText ya no es nullable
-      });
-    });
-  }
-
+  /// Escribe asegurando tamaño.
   void setValue(String sheetName, int row, int col, String value) {
-    final ws = _sheetByName(sheetName);
-    ws.getRangeByIndex(row + 1, col + 1).setText(value);
+    final sheet = _sheets.putIfAbsent(sheetName, () => <List<String>>[]);
+    while (sheet.length <= row) {
+      sheet.add(<String>[]);
+    }
+    final r = sheet[row];
+    while (r.length <= col) {
+      r.add('');
+    }
+    r[col] = value;
   }
 
-  /// Escribe todas las mediciones a una hoja (incluyendo lat/lon)
-  void writeMeasurementsSheet(
-      String sheetName, List<Measurement> measurements) {
-    final ws = _sheetByName(sheetName);
-
-    // Encabezados
-    const headers = [
-      'Progresiva',
-      'Ohm 1m',
-      'Ohm 3m',
-      'Observaciones',
-      'Latitud',
-      'Longitud',
-      'Fecha',
-    ];
-    for (int c = 0; c < headers.length; c++) {
-      ws.getRangeByIndex(1, c + 1).setText(headers[c]);
-    }
-    ws.getRangeByName('A1:G1').cellStyle.bold = true;
-
-    // Filas
-    for (int r = 0; r < measurements.length; r++) {
-      final m = measurements[r];
-      final row = r + 2;
-
-      ws.getRangeByIndex(row, 1).setText(m.progresiva);
-      ws.getRangeByIndex(row, 2).setNumber(m.ohm1m.toDouble());
-      ws.getRangeByIndex(row, 3).setNumber(m.ohm3m.toDouble());
-      ws.getRangeByIndex(row, 4).setText(m.observations);
-      ws.getRangeByIndex(row, 5).setNumber((m.latitude ?? 0.0).toDouble());
-      ws.getRangeByIndex(row, 6).setNumber((m.longitude ?? 0.0).toDouble());
-
-      // Guardar la fecha como fecha real de Excel
-      ws.getRangeByIndex(row, 7).dateTime = m.date;
-    }
-
-    // Formatos
-    final lastRow = measurements.isEmpty ? 2 : (measurements.length + 1);
-    ws.getRangeByName('B2:C$lastRow').numberFormat = '0.00';
-    ws.getRangeByName('E2:F$lastRow').numberFormat = '0.000000';
-    ws.getRangeByName('G2:G$lastRow').numberFormat = 'dd/mm/yyyy';
-
-    // Autofit columnas
-    for (int c = 1; c <= 7; c++) {
-      ws.autoFitColumn(c);
-    }
-  }
-
+  /// Persiste a archivo XLSX. Si [openAfterSave] es true, intenta abrirlo.
   Future<String> saveToFile({
     String fileName = 'gridnote.xlsx',
     bool openAfterSave = false,
   }) async {
-    final bytes = _wb.saveAsStream();
-    _wb.dispose();
+    final book = ex.Excel.createExcel();
 
-    Directory? dir = await getDownloadsDirectory();
-    dir ??= await getApplicationDocumentsDirectory();
+    // Renombramos la hoja por defecto a la primera del map (si existe)
+    final def = book.getDefaultSheet();
+    final names = _sheets.keys.toList(growable: false);
+    if (names.isEmpty) {
+      names.add('Hoja1');
+      _sheets['Hoja1'] = <List<String>>[];
+    }
+    if (def != null && def != names.first) {
+      book.rename(def, names.first);
+    }
 
-    final path = p.join(dir.path, fileName);
-    final file = File(path);
-    await file.writeAsBytes(bytes, flush: true);
+    for (final name in names) {
+      final sh = book[name]; // crea si no existe
+      for (final row in _sheets[name]!) {
+        sh.appendRow(
+          row
+              .map<ex.CellValue>((s) {
+            final d = double.tryParse(s);
+            return (d == null) ? ex.TextCellValue(s) : ex.DoubleCellValue(d);
+          })
+              .toList(growable: false),
+        );
+      }
+    }
+
+    final bytes = book.save();
+    if (bytes == null) {
+      throw Exception('No se pudo serializar el Excel.');
+    }
+    final dir = await getApplicationDocumentsDirectory();
+    final out = File('${dir.path}/${_safeXlsx(fileName)}');
+    await out.writeAsBytes(bytes, flush: true);
 
     if (openAfterSave) {
-      await OpenFile.open(path);
+      // ignore: discarded_futures
+      OpenFilex.open(out.path);
     }
-    return path;
+    return out.path;
+  }
+
+  static String _safeXlsx(String name) {
+    var n = name.trim().isEmpty ? 'gridnote' : name.trim();
+    n = n.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    if (!n.toLowerCase().endsWith('.xlsx')) n = '$n.xlsx';
+    return n;
   }
 }
