@@ -1,43 +1,32 @@
 // lib/widgets/measurement_pluto_grid.dart
 //
-// Reemplazo liviano del grid basado en widgets nativos (DataTable/ListView)
-// para evitar PlutoGrid, manteniendo el API que usan tus pantallas.
-//
-// Soporta:
-// - Edición inline de progresiva, ohm1m, ohm3m, observaciones y fecha
-// - Títulos de columnas personalizables + callback onHeaderTitleChanged/onEditHeader
-// - Filtro por texto (filterQuery)
-// - Selección de fila (para que el Controller actúe sobre ella)
-// - setLocationOnSelection (graba lat/lng en la fila seleccionada)
-// - colorCellSelected (marca visual a nivel de fila)
-// - addPhotoOnSelection (no-op aquí; deja el gancho para que no se rompa nada)
+// Grilla de mediciones usando DataTable + ListView.
+// Mantiene controlador externo y funciones clave (fotos por fila, ubicaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n).
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../models/measurement.dart';
-import '../models/sheet_meta.dart';
-import '../theme/gridnote_theme.dart';
+import 'package:bitacora/models/measurement.dart';
+import 'package:bitacora/models/sheet_meta.dart';
+import 'package:bitacora/theme/gridnote_theme.dart';
 
 typedef RowsChanged = void Function(List<Measurement> rows);
 typedef EditHeader = void Function(String field);
 typedef HeaderTitleChanged = void Function(String field, String value);
 typedef OpenMaps = void Function(Measurement m);
 
-/// Campos que tu código usa como claves de encabezado.
 class MeasurementColumn {
   static const progresiva = 'progresiva';
   static const ohm1m = 'ohm1m';
   static const ohm3m = 'ohm3m';
   static const observations = 'observations';
   static const date = 'date';
-
-  // Opcionales/ocultos en UI, pero algunos modelos los tienen:
   static const maps = '_maps';
   static const photos = '_photos';
 }
 
-/// Controller para acciones sobre la selección actual.
 class MeasurementGridController {
   void Function(Color)? _colorRow;
   void Function(double, double)? _setLoc;
@@ -45,7 +34,6 @@ class MeasurementGridController {
   void Function(int)? _setSelectedRowExternal;
   int Function()? _getSelectedRowExternal;
 
-  // Lo vincula el widget internamente
   void _bind({
     required void Function(Color) colorRow,
     required void Function(double, double) setLoc,
@@ -61,11 +49,10 @@ class MeasurementGridController {
   }
 
   Future<void> colorCellSelected(Color c) async => _colorRow?.call(c);
-  Future<void> setLocationOnSelection(double lat, double lng) async => _setLoc?.call(lat, lng);
+  Future<void> setLocationOnSelection(double lat, double lng) async =>
+      _setLoc?.call(lat, lng);
   Future<void> addPhotoOnSelection() async => _addPhoto?.call();
-
-  /// Permite que desde fuera marques una fila como seleccionada.
-  void setSelectedRow(int i) => _setSelectedRowExternal?.call(i);
+  void setSelectedRow(int index) => _setSelectedRowExternal?.call(index);
   int? get selectedRow => _getSelectedRowExternal?.call();
 }
 
@@ -90,13 +77,12 @@ class MeasurementDataGrid extends StatefulWidget {
   final List<Measurement> initial;
   final GridnoteThemeController themeController;
   final MeasurementGridController controller;
+  final RowsChanged onChanged;
 
   final Map<String, String> headerTitles;
   final EditHeader? onEditHeader;
   final HeaderTitleChanged? onHeaderTitleChanged;
   final OpenMaps? onOpenMaps;
-  final RowsChanged onChanged;
-
   final String? filterQuery;
   final bool aiEnabled;
   final bool showPhotoRail;
@@ -117,21 +103,32 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
     _rows = List<Measurement>.from(widget.initial);
 
     widget.controller._bind(
-      colorRow: (c) => setState(() {
-        if (_selected >= 0) _rowTint[_selected] = c;
+      colorRow: (color) => setState(() {
+        if (_selected >= 0) _rowTint[_selected] = color;
       }),
-      setLoc: (la, lo) {
+      setLoc: (lat, lng) {
         if (_selected < 0 || _selected >= _rows.length) return;
         final m = _rows[_selected];
-        _rows[_selected] = m.copyWith(latitude: la, longitude: lo);
+        _rows[_selected] = m.copyWith(latitude: lat, longitude: lng);
         widget.onChanged(List<Measurement>.from(_rows));
         setState(() {});
       },
-      addPhoto: () {
-        // Placeholder: aquí podrías abrir tu flujo real de fotos si lo deseas.
-        // Se deja no-op para no romper el API.
+      addPhoto: () async {
+        if (_selected < 0 || _selected >= _rows.length) return;
+        final picker = ImagePicker();
+        final XFile? imageFile =
+        await picker.pickImage(source: ImageSource.camera);
+        if (!mounted || imageFile == null) return;
+
+        final m = _rows[_selected];
+        final updatedPhotos =
+        List<String>.from(m.photos)..add(imageFile.path);
+        _rows[_selected] = m.copyWith(photos: updatedPhotos);
+
+        widget.onChanged(List<Measurement>.from(_rows));
+        setState(() {});
       },
-      setSelected: (i) => setState(() => _selected = i),
+      setSelected: (index) => setState(() => _selected = index),
       getSelected: () => _selected,
     );
   }
@@ -139,59 +136,63 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
   @override
   void didUpdateWidget(covariant MeasurementDataGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Si cambian las filas por arriba, sincronizamos
     if (!identical(oldWidget.initial, widget.initial)) {
       _rows = List<Measurement>.from(widget.initial);
       if (_selected >= _rows.length) _selected = -1;
     }
   }
 
-  String _titleFor(String field, String fallback) =>
-      widget.headerTitles[field]?.trim().isNotEmpty == true
-          ? widget.headerTitles[field]!.trim()
-          : fallback;
+  String _titleFor(String field, String fallback) {
+    final custom = widget.headerTitles[field];
+    return (custom != null && custom.trim().isNotEmpty)
+        ? custom.trim()
+        : fallback;
+  }
 
   List<Measurement> _visible() {
     final q = (widget.filterQuery ?? '').trim().toLowerCase();
     if (q.isEmpty) return _rows;
+
     bool match(Measurement m) {
       if (m.progresiva.toLowerCase().contains(q)) return true;
       if (m.observations.toLowerCase().contains(q)) return true;
-      if ('${m.ohm1m}'.contains(q)) return true;
-      if ('${m.ohm3m}'.contains(q)) return true;
+      if ('${m.ohm1m ?? ''}'.contains(q)) return true;
+      if ('${m.ohm3m ?? ''}'.contains(q)) return true;
       return false;
     }
 
-    // Mantén índices relativos para selección visual
-    final list = <Measurement>[];
+    final filtered = <Measurement>[];
     for (final m in _rows) {
-      if (match(m)) list.add(m);
+      if (match(m)) filtered.add(m);
     }
-    return list;
+    return filtered;
   }
 
-  void _mutateRow(int absIndex, Measurement next) {
-    _rows[absIndex] = next;
+  void _mutateRow(int absIndex, Measurement updated) {
+    _rows[absIndex] = updated;
     widget.onChanged(List<Measurement>.from(_rows));
     setState(() {});
   }
 
-  Future<void> _pickDate(int absIndex, DateTime? initial) async {
+  Future<void> _pickDate(int absIndex, DateTime? initialDate) async {
     final now = DateTime.now();
     final first = DateTime(now.year - 5, 1, 1);
     final last = DateTime(now.year + 5, 12, 31);
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial ?? now,
+      initialDate: initialDate ?? now,
       firstDate: first,
       lastDate: last,
+      confirmText: 'OK',
+      cancelText: 'Cancelar',
     );
-    if (picked == null) return;
+    if (!mounted || picked == null) return;
+
     _mutateRow(absIndex, _rows[absIndex].copyWith(date: picked));
   }
 
-  DataColumn _col(String field, String fallback) {
-    final title = _titleFor(field, fallback);
+  DataColumn _col(String field, String defaultTitle) {
+    final titleText = _titleFor(field, defaultTitle);
     return DataColumn(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -200,29 +201,33 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
             child: GestureDetector(
               onTap: () => widget.onEditHeader?.call(field),
               onLongPress: () async {
-                // edición rápida inline del título
-                final ctl = TextEditingController(text: title);
-                final txt = await showDialog<String>(
+                final controller = TextEditingController(text: titleText);
+                final newTitle = await showDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Título de columna'),
+                    title: const Text('TÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­tulo de columna'),
                     content: TextField(
-                      controller: ctl,
+                      controller: controller,
                       autofocus: true,
-                      decoration: const InputDecoration(hintText: 'Nuevo título'),
+                      decoration:
+                      const InputDecoration(hintText: 'Nuevo tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­tulo...'),
                     ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: const Text('Guardar')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar')),
+                      FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(ctx, controller.text.trim()),
+                          child: const Text('Guardar')),
                     ],
                   ),
                 );
-                if (txt != null && txt.isNotEmpty) {
-                  widget.onHeaderTitleChanged?.call(field, txt);
-                  setState(() {}); // pinta el nuevo label
+                if (newTitle != null && newTitle.isNotEmpty) {
+                  widget.onHeaderTitleChanged?.call(field, newTitle);
                 }
               },
-              child: Text(title, overflow: TextOverflow.ellipsis),
+              child: Text(titleText, overflow: TextOverflow.ellipsis),
             ),
           ),
           const SizedBox(width: 4),
@@ -235,34 +240,34 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
   @override
   Widget build(BuildContext context) {
     final t = widget.themeController.theme;
-    final rows = _visible();
+    final visibleRows = _visible();
 
-    // Mapa visible->índice absoluto
+    // Map ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ndice visible -> ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­ndice real
     final Map<int, int> v2abs = {};
-    int abs = 0;
+    int vIndex = 0;
     for (int i = 0; i < _rows.length; i++) {
       final m = _rows[i];
-      if (rows.contains(m)) {
-        v2abs[abs] = i;
-        abs++;
+      if (visibleRows.contains(m)) {
+        v2abs[vIndex] = i;
+        vIndex++;
       }
     }
 
     final columns = <DataColumn>[
       _col(MeasurementColumn.progresiva, 'Progresiva'),
-      _col(MeasurementColumn.ohm1m, '1m (Ω)'),
-      _col(MeasurementColumn.ohm3m, '3m (Ω)'),
+      _col(MeasurementColumn.ohm1m, '1m (ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â©)'),
+      _col(MeasurementColumn.ohm3m, '3m (ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â©)'),
       _col(MeasurementColumn.observations, 'Obs'),
       _col(MeasurementColumn.date, 'Fecha'),
       const DataColumn(label: Icon(Icons.map_outlined, size: 16)),
     ];
 
     final dataRows = <DataRow>[];
-    for (int vIndex = 0; vIndex < rows.length; vIndex++) {
-      final absIndex = v2abs[vIndex]!;
+    for (int visIndex = 0; visIndex < visibleRows.length; visIndex++) {
+      final absIndex = v2abs[visIndex]!;
       final m = _rows[absIndex];
-      final selected = absIndex == _selected;
-      final tint = _rowTint[absIndex];
+      final isSelected = (absIndex == _selected);
+      final tintColor = _rowTint[absIndex];
 
       Widget txtCell({
         required String initial,
@@ -270,9 +275,9 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
         TextInputType? type,
         int maxLines = 1,
       }) {
-        final ctl = TextEditingController(text: initial);
+        final controller = TextEditingController(text: initial);
         return TextField(
-          controller: ctl,
+          controller: controller,
           maxLines: maxLines,
           keyboardType: type,
           decoration: const InputDecoration(
@@ -280,23 +285,23 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
             border: InputBorder.none,
             contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           ),
-          onChanged: onChanged,
+          style: TextStyle(fontSize: 14, color: t.text),
           onTap: () => setState(() => _selected = absIndex),
+          onChanged: onChanged,
         );
       }
 
       DataCell dateCell() {
-        final txt = m.date == null ? '-' : _fmt.format(m.date!.toLocal());
+        final d = m.date;
+        final dateStr = d != null ? _fmt.format(d.toLocal()) : '-';
         return DataCell(
-          InkWell(
-            onTap: () {
+          TextButton(
+            onPressed: () {
               setState(() => _selected = absIndex);
-              _pickDate(absIndex, m.date);
+              _pickDate(absIndex, d);
             },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-              child: Text(txt),
-            ),
+            child:
+            Text(dateStr, style: TextStyle(fontSize: 13, color: t.accent)),
           ),
         );
       }
@@ -305,8 +310,16 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
         return DataCell(
           IconButton(
             tooltip: 'Abrir en mapas',
-            onPressed: widget.onOpenMaps == null ? null : () => widget.onOpenMaps!(m),
             icon: const Icon(Icons.map_outlined),
+            color: (m.latitude != null && m.longitude != null)
+                ? t.accent
+                : t.text.withAlpha(153),
+            onPressed: widget.onOpenMaps == null
+                ? null
+                : () {
+              setState(() => _selected = absIndex);
+              widget.onOpenMaps!(m);
+            },
           ),
         );
       }
@@ -315,25 +328,28 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
         DataCell(
           txtCell(
             initial: m.progresiva,
-            onChanged: (v) => _mutateRow(absIndex, m.copyWith(progresiva: v)),
+            onChanged: (val) =>
+                _mutateRow(absIndex, m.copyWith(progresiva: val)),
           ),
         ),
         DataCell(
           txtCell(
-            initial: (m.ohm1m ?? 0).toString(),
-            type: const TextInputType.numberWithOptions(decimal: true, signed: false),
-            onChanged: (v) {
-              final n = double.tryParse(v.replaceAll(',', '.'));
+            initial: m.ohm1m?.toString() ?? '',
+            type: const TextInputType.numberWithOptions(
+                decimal: true, signed: false),
+            onChanged: (val) {
+              final n = double.tryParse(val.replaceAll(',', '.'));
               _mutateRow(absIndex, m.copyWith(ohm1m: n));
             },
           ),
         ),
         DataCell(
           txtCell(
-            initial: (m.ohm3m ?? 0).toString(),
-            type: const TextInputType.numberWithOptions(decimal: true, signed: false),
-            onChanged: (v) {
-              final n = double.tryParse(v.replaceAll(',', '.'));
+            initial: m.ohm3m?.toString() ?? '',
+            type: const TextInputType.numberWithOptions(
+                decimal: true, signed: false),
+            onChanged: (val) {
+              final n = double.tryParse(val.replaceAll(',', '.'));
               _mutateRow(absIndex, m.copyWith(ohm3m: n));
             },
           ),
@@ -342,7 +358,8 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
           txtCell(
             initial: m.observations,
             maxLines: 2,
-            onChanged: (v) => _mutateRow(absIndex, m.copyWith(observations: v)),
+            onChanged: (val) =>
+                _mutateRow(absIndex, m.copyWith(observations: val)),
           ),
         ),
         dateCell(),
@@ -351,9 +368,9 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
 
       dataRows.add(
         DataRow(
-          selected: selected,
-          color: MaterialStateProperty.resolveWith<Color?>(
-                (states) => tint ?? (selected ? t.accent.withOpacity(.18) : null),
+          selected: isSelected,
+          color: WidgetStateProperty.resolveWith<Color?>(
+                (states) => tintColor ?? (isSelected ? t.accent.withAlpha(46) : null),
           ),
           onSelectChanged: (_) => setState(() => _selected = absIndex),
           cells: cells,
@@ -365,7 +382,7 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
       decoration: BoxDecoration(
         color: t.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: t.divider),
+        border: Border.all(color: t.divider.withAlpha(153)),
       ),
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -373,16 +390,34 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
         children: [
           Expanded(
             child: Text(
-              'Filas: ${rows.length}  •  Sel: ${_selected >= 0 ? (_selected + 1) : '-'}',
-              style: TextStyle(color: t.text.withOpacity(.85)),
+              'Filas: ${visibleRows.length}  ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢  Sel: ${_selected >= 0 ? (_selected + 1) : '-'}',
+              style: TextStyle(color: t.text.withAlpha(217)),
             ),
           ),
           if (widget.aiEnabled)
-            const Chip(visualDensity: VisualDensity.compact, avatar: Icon(Icons.auto_awesome), label: Text('IA')),
+            const Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: Icon(Icons.auto_awesome),
+              label: Text('IA'),
+            ),
+          if (widget.showPhotoRail) const SizedBox(width: 8),
           if (widget.showPhotoRail)
-            const SizedBox(width: 8),
+            Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: const Icon(Icons.photo_library_outlined),
+              label: Text(
+                'Fotos: ${_selected >= 0 && _selected < _rows.length ? _rows[_selected].photos.length : '-'}',
+              ),
+            ),
+          if (widget.showPhotoRail) const SizedBox(width: 8),
           if (widget.showPhotoRail)
-            const Chip(visualDensity: VisualDensity.compact, avatar: Icon(Icons.photo_library_outlined), label: Text('Fotos')),
+            IconButton(
+              icon: const Icon(Icons.camera_alt_outlined),
+              tooltip: 'Adjuntar foto a esta fila',
+              onPressed: _selected < 0
+                  ? null
+                  : () => widget.controller.addPhotoOnSelection(),
+            ),
         ],
       ),
     );
@@ -390,24 +425,50 @@ class _MeasurementDataGridState extends State<MeasurementDataGrid> {
     return Column(
       children: [
         headerBar,
+        if (widget.showPhotoRail)
+          Padding(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            child: _selected >= 0 &&
+                _selected < _rows.length &&
+                _rows[_selected].photos.isNotEmpty
+                ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _rows[_selected].photos
+                    .map(
+                      (path) => Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Image.file(
+                      File(path),
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+                    .toList(),
+              ),
+            )
+                : Text(
+              'Sin fotos adjuntas en esta fila',
+              style: TextStyle(color: t.text.withAlpha(179)),
+            ),
+          ),
         Expanded(
           child: Scrollbar(
+            thumbVisibility: true,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 880),
-                child: SingleChildScrollView(
-                  child: DataTable(
-                    headingRowColor: MaterialStatePropertyAll(t.surface),
-                    dataRowMinHeight: 48,
-                    dataRowMaxHeight: 68,
-                    columns: columns,
-                    rows: dataRows,
-                    border: TableBorder.symmetric(
-                      inside: BorderSide(color: t.divider.withOpacity(.6)),
-                      outside: BorderSide(color: t.divider),
-                    ),
-                  ),
+                child: DataTable(
+                  headingRowHeight: 40,
+                  dataRowMinHeight: 48,
+                  dataRowMaxHeight: 56,
+                  headingRowColor: WidgetStatePropertyAll(t.surface),
+                  columns: columns,
+                  rows: dataRows,
                 ),
               ),
             ),
