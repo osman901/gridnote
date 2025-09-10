@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../theme/gridnote_theme.dart';
 import '../services/location_service.dart';
-import '../widgets/measurement_pluto_grid.dart'; // <- Import correcto (define MeasurementGridController)
+import '../widgets/measurement_pluto_grid.dart';
 
 class ExcelToolbar extends StatefulWidget {
   const ExcelToolbar({
@@ -44,12 +44,10 @@ class _ExcelToolbarState extends State<ExcelToolbar> {
         ],
       ),
     );
-    // Evita deprecations: usar withValues(alpha: ...)
     await widget.gridController.colorCellSelected(picked.withValues(alpha: 0.45));
   }
 
   Future<void> _setMyLocation() async {
-    // Aviso previo (sin await)
     if (!await Geolocator.isLocationServiceEnabled()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Activá el GPS')));
@@ -69,7 +67,6 @@ class _ExcelToolbarState extends State<ExcelToolbar> {
     final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     await widget.gridController.setLocationOnSelection(pos.latitude, pos.longitude);
 
-    // Compartir/mostrar link (usar LocationService existente)
     final url = LocationService.instance.mapsUrl(pos.latitude, pos.longitude);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -123,4 +120,3 @@ class _ExcelToolbarState extends State<ExcelToolbar> {
     );
   }
 }
-

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../models/measurement.dart';
 import '../data/measurement_repository.dart';
 import '../ai/anomaly_service.dart';
 import '../ai/fill_suggester.dart';

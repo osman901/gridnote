@@ -26,8 +26,8 @@ class _EditMeasurementSheetState extends State<EditMeasurementSheet> {
     super.initState();
     final m = widget.model;
     _prog = TextEditingController(text: m.progresiva);
-    _ohm1 = TextEditingController(text: m.ohm1m == null ? '' : '${m.ohm1m}');
-    _ohm3 = TextEditingController(text: m.ohm3m == null ? '' : '${m.ohm3m}');
+    _ohm1 = TextEditingController(text: '${m.ohm1m}');
+    _ohm3 = TextEditingController(text: '${m.ohm3m}');
     _obs  = TextEditingController(text: m.observations);
     _lat  = TextEditingController(text: m.latitude == null ? '' : '${m.latitude}');
     _lng  = TextEditingController(text: m.longitude == null ? '' : '${m.longitude}');

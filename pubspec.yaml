@@ -9,72 +9,111 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
-  # --- Service Locator ---
   get_it: ^7.7.0
-
-  # --- Estado / DI ---
   flutter_riverpod: ^2.6.1
   provider: ^6.1.5
   collection: ^1.18.0
   crypto: ^3.0.6
   cryptography: ^2.7.0
+  characters: ^1.4.0
 
-  # --- UI & Theming ---
   cupertino_icons: ^1.0.8
   flutter_colorpicker: ^1.1.0
   modal_bottom_sheet: ^3.0.0
-  wolt_modal_sheet: ^0.6.0
+  wolt_modal_sheet: ^0.11.0
   flutter_easyloading: ^3.0.5
   rounded_loading_button: ^2.1.0
   flutter_spinkit: ^5.2.0
   flutter_speed_dial: ^7.0.0
   flutter_staggered_grid_view: ^0.7.0
 
-  # --- Data Grid & Reporting ---
   pluto_grid: ^8.0.0
   pdf: ^3.11.3
-  intl: ^0.19.0
   barcode: ^2.2.7
   csv: ^6.0.0
-  syncfusion_flutter_xlsio: any
 
-  # --- Offline First (100% local) ---
+  # Importar/Exportar XLSX
+  excel: ^4.0.6
+  syncfusion_flutter_xlsio: ^29.2.11
+  path_provider: ^2.1.4
+  share_plus: ^10.1.4
+
+  # Storage / prefs
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  shared_preferences: ^2.3.2
-  path_provider: ^2.1.4
+  shared_preferences: ^2.5.3
   path: ^1.9.0
   flutter_secure_storage: ^9.2.2
 
-  # --- Notificaciones locales ---
+  # Notificaciones / permisos / zona horaria
   flutter_local_notifications: ^17.2.1+2
   permission_handler: ^11.3.1
   timezone: ^0.9.3
 
-  # --- Hardware & Plataformas ---
+  # Sensores / multimedia / conectividad
   geolocator: ^10.1.1
-  image_picker: ^1.1.2
+  camera: ^0.11.0+2
+  image_picker: ^1.2.0
   connectivity_plus: ^6.1.4
   mobile_scanner: ^7.0.1
 
-  # --- Mapas ---
+  # Mapas
   flutter_map: ^6.1.0
   latlong2: ^0.9.1
 
-  # --- Sharing & Archivos ---
-  share_plus: ^10.1.4
+  # Sharing / utilidades
   flutter_email_sender: ^6.0.3
   url_launcher: ^6.3.0
   open_filex: ^4.5.0
   file_picker: ^8.0.3
+  signature: ^5.5.0
 
-  # --- IA / OCR / Charts / Importador (opcionales) ---
+  # ML
   google_mlkit_text_recognition: ^0.13.0
+
+  # Charts / red / utils
   fl_chart: ^0.69.0
-  excel: ^4.0.6
   dio: ^5.5.0
   http: ^1.2.2
+  uuid: ^4.5.1
+
+  # Mantener alineado con Flutter SDK
+  intl: ^0.20.2
+  image: 4.3.0
+
+  # ===== Autenticación / Firebase =====
+  firebase_core: ^4.1.0
+  firebase_auth: ^6.0.2
+  google_sign_in: ^6.2.1
+
+  # ===== Dictado a texto =====
+  speech_to_text: ^7.3.0
+
+  # DB local (Drift + sqlite FFI)
+  sqflite: ^2.2.8
+  drift: ^2.12.0
+  sqlite3_flutter_libs: ^0.5.24
+
+  # UI/UX opcionales
+  flutter_slidable: ^3.0.0
+  auto_size_text: ^3.0.0
+
+  # IA on-device
+  tflite_flutter: ^0.10.4
+
+  # IA cloud (Gemini / OpenAI)
+  google_generative_ai: ^0.4.6
+  dart_openai: ^5.1.0
+  flutter_dotenv: ^5.1.0
+
+  # Riverpod codegen (opcional)
+  riverpod_annotation: ^2.3.5
+  cloud_firestore: ^6.0.1
+  device_info_plus: ^11.5.0
+  package_info_plus: ^8.3.1
 
 dev_dependencies:
   flutter_test:
@@ -83,15 +122,15 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   very_good_analysis: ^5.1.0
-  build_runner: ^2.4.13   # ← corregido para compatibilidad con hive_generator 2.0.1
+  build_runner: ^2.4.13
   hive_generator: ^2.0.1
+  drift_dev: ^2.12.0
+  riverpod_generator: ^2.4.0
+
+dependency_overrides:
+  intl: 0.20.2
 
 flutter:
   uses-material-design: true
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
-  # fonts:
-  #   - family: RobotoMono
-  #     fonts:
-  #       - asset: assets/fonts/RobotoMono/RobotoMono-VariableFont_wght.ttf
+  assets:
+    - .env

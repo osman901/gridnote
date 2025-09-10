@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'dev.flutter.flutter-gradle-plugin'
+    // id 'com.google.gms.google-services' // <- habilitalo si usás Firebase
+}
+
+android {
+    namespace "com.gridnote.bitacora"
+
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.gridnote.bitacora"
+
+        // image_picker / geolocator ok con 26+
+        minSdk 26
+        targetSdk 36
+
+        // tomá versión desde pubspec (flutter)
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+
+        multiDexEnabled true
+    }
+
+    // Si realmente necesitás NDK, descomentá:
+    // ndkVersion "27.0.12077973"
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions { jvmTarget = '17' }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+            signingConfig signingConfigs.debug // cámbialo por tu keystore cuando tengas una
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ["META-INF/*"]
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24"
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+}

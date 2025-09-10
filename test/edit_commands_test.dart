@@ -1,7 +1,7 @@
 // test/edit_commands_test.dart
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/measurement.dart';
-import '../lib/state/edit_commands.dart';
+import 'package:gridnote/models/measurement.dart';
+import 'package:gridnote/state/edit_commands.dart';
 import 'fakes/fake_repository.dart';
 
 Measurement m({int? id, String p = 'A', double o1 = 1, double o3 = 3}) => Measurement(

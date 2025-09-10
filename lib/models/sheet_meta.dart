@@ -1,4 +1,3 @@
-// lib/models/sheet_meta.dart
 class SheetMeta {
   const SheetMeta({
     required this.id,
@@ -7,7 +6,7 @@ class SheetMeta {
     required this.updatedAt,
     this.latitude,
     this.longitude,
-    this.author, // <-- NUEVO
+    this.author,
   });
 
   final String id;
@@ -16,7 +15,7 @@ class SheetMeta {
   final DateTime updatedAt;
   final double? latitude;
   final double? longitude;
-  final String? author; // <-- NUEVO
+  final String? author;
 
   SheetMeta copyWith({
     String? id,
@@ -25,7 +24,7 @@ class SheetMeta {
     DateTime? updatedAt,
     double? latitude,
     double? longitude,
-    String? author, // <-- NUEVO
+    String? author,
   }) {
     return SheetMeta(
       id: id ?? this.id,
@@ -34,7 +33,7 @@ class SheetMeta {
       updatedAt: updatedAt ?? this.updatedAt,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
-      author: author ?? this.author, // <-- NUEVO
+      author: author ?? this.author,
     );
   }
 }

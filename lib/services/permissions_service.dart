@@ -1,3 +1,4 @@
+// lib/services/permissions_service.dart
 // Solicita permisos claves (Android 13/14+): notifs y fotos seleccionadas.
 import 'dart:io' show Platform;
 import 'package:permission_handler/permission_handler.dart';
@@ -46,3 +47,4 @@ class PermissionsService {
     return PhotosAccess.denied;
   }
 }
+

@@ -42,5 +42,5 @@ class GridnoteShaderWarmUp extends ShaderWarmUp {
 Future<void> warmUpEngine() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Setter ESTÁTICO correcto; instancia NO const para evitar el warning.
-  PaintingBinding.shaderWarmUp = GridnoteShaderWarmUp();
+  PaintingBinding.shaderWarmUp = const GridnoteShaderWarmUp();
 }

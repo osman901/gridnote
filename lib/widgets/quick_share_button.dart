@@ -30,7 +30,7 @@ class QuickShareButton extends StatefulWidget {
 class _QuickShareButtonState extends State<QuickShareButton> {
   final _emailCtrl = TextEditingController();
   final _store = FrequentEmailStore();
-  final _mail = QuickMailService();
+  final QuickMailService _mail = const QuickMailService(); // ✅ fijo el error
   bool _sending = false;
   List<String> _suggestions = [];
 
@@ -98,7 +98,7 @@ class _QuickShareButtonState extends State<QuickShareButton> {
                         (e) => ActionChip(
                       label: Text(e),
                       onPressed: () => _emailCtrl.text = e,
-                      backgroundColor: cs.surfaceVariant,
+                      backgroundColor: cs.surfaceContainerHighest,
                       labelStyle: TextStyle(color: cs.onSurfaceVariant),
                     ),
                   )
@@ -185,7 +185,7 @@ class _QuickShareButtonState extends State<QuickShareButton> {
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: const StadiumBorder(),
-        backgroundColor: cs.surfaceVariant,
+        backgroundColor: cs.surfaceContainerHighest,
         foregroundColor: cs.onSurfaceVariant,
       ),
       child: child,

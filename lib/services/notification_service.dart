@@ -1,89 +1,61 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
 
 class NotificationService {
-  NotificationService._();
-  static final instance = NotificationService._();
+  NotificationService._internal();
+  static final NotificationService instance = NotificationService._internal();
 
-  final _fln = FlutterLocalNotificationsPlugin();
-  bool _inited = false;
+  final FlutterLocalNotificationsPlugin _plugin =
+  FlutterLocalNotificationsPlugin();
+
+  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
+    'gridnote_saved_channel',
+    'Gridnote – Guardados',
+    description: 'Avisos cuando se guardan/exportan planillas',
+    importance: Importance.high,
+  );
 
   Future<void> init() async {
-    if (_inited) return;
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const ios = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-    await _fln.initialize(
-      const InitializationSettings(android: android, iOS: ios),
+    const initAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const init = InitializationSettings(android: initAndroid);
+
+    await _plugin.initialize(
+      init,
       onDidReceiveNotificationResponse: (resp) async {
-        final p = resp.payload;
-        if (p == null || p.isEmpty) return;
-        // Intentar abrir archivo
-        await OpenFilex.open(p);
+        final path = resp.payload;
+        if (path == null || path.isEmpty) return;
+        await OpenFilex.open(path);
       },
     );
-    _inited = true;
+
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_channel);
   }
 
-  Future<void> showSavedSheetBanner({
-    required BuildContext context,
-    required String sheetId,
-    String? sheetName,
+  Future<void> showSavedSheet({
+    required String title,
+    required String body,
+    required String filePath,
   }) async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/sheets/$sheetId.json');
-
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearMaterialBanners();
-    messenger.showMaterialBanner(
-      MaterialBanner(
-        content: Text(
-          'Cambios guardados ${sheetName == null ? '' : 'en "$sheetName"'}\n${file.path}',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        leading: const Icon(Icons.check_circle, color: Colors.green),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        actions: [
-          TextButton(
-            onPressed: () async {
-              messenger.hideCurrentMaterialBanner();
-              await OpenFilex.open(file.path); // muchos gestores abren el archivo
-            },
-            child: const Text('ABRIR'),
-          ),
-          TextButton(
-            onPressed: () => messenger.hideCurrentMaterialBanner(),
-            child: const Text('OK'),
-          ),
-        ],
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channel.id,
+        _channel.name,
+        channelDescription: _channel.description,
+        importance: Importance.high,
+        priority: Priority.high,
+        styleInformation: const BigTextStyleInformation(''),
       ),
     );
-  }
 
-  Future<void> notifyExportedFile(File file, {String? title}) async {
-    await _fln.show(
-      2001,
-      title ?? 'Exportación lista',
-      file.path,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'gridnote_ops', 'Operaciones',
-          channelDescription: 'Notificaciones de guardado/exports',
-          importance: Importance.high,
-          priority: Priority.high,
-          styleInformation: const BigTextStyleInformation(''),
-          category: AndroidNotificationCategory.status,
-        ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      payload: file.path, // al tocar se abre
+    await _plugin.show(
+      10001, // id fijo está bien para reemplazar la última
+      title,
+      body,
+      details,
+      payload: filePath, // al tocar abre este archivo
     );
   }
 }

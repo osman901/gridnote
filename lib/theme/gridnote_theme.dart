@@ -8,32 +8,37 @@ class GridnoteTheme {
     required this.textFaint,
     required this.accent,
     required this.divider,
+    required this.selection,
   });
 
   final Color scaffold;
   final Color surface;
   final Color text;
   final Color textFaint;
-  final Color accent;
-  final Color divider;
+  final Color accent;     // acento (botones, foco)
+  final Color divider;    // líneas sutiles
+  final Color selection;  // resalte/selección
 
-  factory GridnoteTheme.light() => const GridnoteTheme(
-    scaffold: Color(0xFFF7F7F7),
-    surface: Color(0xFFFFFFFF),
-    text: Color(0xFF1F2428),
-    textFaint: Color(0x991F2428),
-    accent: Color(0xFF2962FF),
-    divider: Color(0x1F000000),
+  // Claro
+  factory GridnoteTheme.light() => GridnoteTheme(
+    scaffold: const Color(0xFFF6F6F6),
+    surface: const Color(0xFFFFFFFF),
+    text: const Color(0xFF141414),
+    textFaint: const Color(0x99141414),
+    accent: const Color(0xFF000000),
+    divider: const Color(0x19000000),
+    selection: const Color(0xFF000000).withOpacity(.18),
   );
 
-  /// DARK + GREEN (fondo negro más intenso, texto claro, rejas verdes)
-  factory GridnoteTheme.dark() => const GridnoteTheme(
-    scaffold: Color(0xFF070908), // más negro
-    surface:  Color(0xFF0B0E0C), // panel
-    text:     Color(0xFFECEFEA),
-    textFaint:Color(0x99ECEFEA),
-    accent:   Color(0xFF00E676), // verde principal
-    divider:  Color(0x3300E676), // rejas verdes sutiles
+  // Oscuro
+  factory GridnoteTheme.dark() => GridnoteTheme(
+    scaffold: const Color(0xFF0C0C0C),
+    surface: const Color(0xFF141414),
+    text: const Color(0xFFF0F0F0),
+    textFaint: const Color(0x99F0F0F0),
+    accent: const Color(0xFFFFFFFF),
+    divider: const Color(0x22FFFFFF),
+    selection: const Color(0xFFFFFFFF).withOpacity(.35),
   );
 
   GridnoteTheme copyWith({
@@ -43,6 +48,7 @@ class GridnoteTheme {
     Color? textFaint,
     Color? accent,
     Color? divider,
+    Color? selection,
   }) =>
       GridnoteTheme(
         scaffold: scaffold ?? this.scaffold,
@@ -51,16 +57,21 @@ class GridnoteTheme {
         textFaint: textFaint ?? this.textFaint,
         accent: accent ?? this.accent,
         divider: divider ?? this.divider,
+        selection: selection ?? this.selection,
       );
 }
 
 class GridnoteThemeController extends ChangeNotifier {
   GridnoteThemeController({GridnoteTheme? initial})
-      : _theme = initial ?? GridnoteTheme.dark(); // por defecto dark+green
+      : _theme = initial ?? GridnoteTheme.dark();
   GridnoteTheme _theme;
   GridnoteTheme get theme => _theme;
 
-  void setTheme(GridnoteTheme t) { _theme = t; notifyListeners(); }
+  void setTheme(GridnoteTheme t) {
+    _theme = t;
+    notifyListeners();
+  }
+
   void toggleDark() {
     final isDark = _theme.scaffold.computeLuminance() < 0.5;
     _theme = isDark ? GridnoteTheme.light() : GridnoteTheme.dark();
@@ -68,7 +79,7 @@ class GridnoteThemeController extends ChangeNotifier {
   }
 }
 
-/// Paleta específica para la tabla
+/// Estilo para tablas
 class GridnoteTableStyle {
   const GridnoteTableStyle({
     required this.gridLine,
@@ -80,21 +91,24 @@ class GridnoteTableStyle {
     required this.fontFamily,
   });
 
-  final Color gridLine;   // rejas
+  final Color gridLine;
   final Color cellBg;
   final Color altCellBg;
   final Color headerBg;
   final Color headerText;
-  final Color selection;  // foco/selección
+  final Color selection;
   final String fontFamily;
 
-  factory GridnoteTableStyle.from(GridnoteTheme t) => GridnoteTableStyle(
-    gridLine: t.divider,
-    cellBg: t.surface,
-    altCellBg: t.surface.withValues(alpha: 0.94),
-    headerBg: const Color(0xFF102015), // verde muy oscuro
-    headerText: t.text,
-    selection: t.accent,
-    fontFamily: 'Arimo',
-  );
+  factory GridnoteTableStyle.from(GridnoteTheme t) {
+    final isDark = t.scaffold.computeLuminance() < 0.5;
+    return GridnoteTableStyle(
+      gridLine: t.divider,
+      cellBg: t.surface,
+      altCellBg: isDark ? const Color(0xFF101010) : const Color(0xFFF9F9F9),
+      headerBg: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEFEFEF),
+      headerText: t.text,
+      selection: t.selection,
+      fontFamily: 'Arimo',
+    );
+  }
 }

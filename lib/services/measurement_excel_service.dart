@@ -1,4 +1,3 @@
-// lib/services/measurement_excel_service.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -7,7 +6,7 @@ import '../models/measurement.dart';
 import 'xlsx_export_service.dart';
 
 class MeasurementExcelService {
-  /// Genera el XLSX usando el nuevo XlsxExportService.
+  /// Genera el XLSX usando el XlsxExportService.
   static Future<File> buildExcelFile({
     required List<Measurement> data,
     String? sheetId,
@@ -38,21 +37,18 @@ class MeasurementExcelService {
     double? defaultLng,
   }) async {
     final h = headers ?? const {};
+    // Nueva columna “Ubicación” (reemplaza Lat/Lng)
     final cols = <String>[
       h['date'] ?? 'Fecha',
       h['progresiva'] ?? 'Progresiva',
       h['ohm1m'] ?? '1m (Ω)',
       h['ohm3m'] ?? '3m (Ω)',
       h['observations'] ?? 'Obs',
-      h['lat'] ?? 'Lat',
-      h['lng'] ?? 'Lng',
+      'Ubicación',
     ];
 
     final base = suggestedFileName.isEmpty ? 'Planilla' : suggestedFileName;
-    final stamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '')
-        .replaceAll('.', '');
+    final stamp = DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '');
     final title = '$base $stamp';
 
     final file = await buildExcelFile(
@@ -68,8 +64,7 @@ class MeasurementExcelService {
       [
         XFile(
           file.path,
-          mimeType:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ),
       ],
       subject: 'Gridnote – Reporte XLSX',

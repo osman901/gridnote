@@ -57,6 +57,7 @@ class MeasurementRestRepository implements MeasurementRepository {
   }
 
   /// Compat: si en alguna parte del código llaman `saveAll`, delegamos.
+  @override
   Future<void> saveAll(List<Measurement> items) => saveMany(items);
 
   // ---------- JSON mappers (ajustá llaves según tu API) ----------

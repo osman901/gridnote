@@ -56,8 +56,8 @@ class _EditableMeasurementTableState extends State<EditableMeasurementTable> {
     for (final m in widget.measurements) {
       _controllers.add({
         'progresiva': TextEditingController(text: m.progresiva),
-        'ohm1m': TextEditingController(text: m.ohm1m?.toString() ?? ''),
-        'ohm3m': TextEditingController(text: m.ohm3m?.toString() ?? ''),
+        'ohm1m': TextEditingController(text: m.ohm1m.toString() ?? ''),
+        'ohm3m': TextEditingController(text: m.ohm3m.toString() ?? ''),
         'observations': TextEditingController(text: m.observations),
         'latitude': TextEditingController(text: m.latitude?.toString() ?? ''),
         'longitude': TextEditingController(text: m.longitude?.toString() ?? ''),

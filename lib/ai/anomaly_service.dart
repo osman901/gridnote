@@ -19,13 +19,12 @@ class AnomalyService {
     final pts = items.where((m) => m.latitude != null && m.longitude != null).toList();
     final flags = <AnomalyFlag>[];
     for (final m in pts) {
-      final v = (m.ohm1m ?? m.ohm3m)?.toDouble();
-      if (v == null) continue;
+      final v = (m.ohm1m ?? m.ohm3m).toDouble();
 
       final neigh = pts.where((o) {
         if (identical(o, m)) return false;
         return _haversine(m.latitude!, m.longitude!, o.latitude!, o.longitude!) <= radiusMeters;
-      }).map((o) => (o.ohm1m ?? o.ohm3m)?.toDouble()).whereType<double>().toList();
+      }).map((o) => (o.ohm1m ?? o.ohm3m).toDouble()).whereType<double>().toList();
 
       if (neigh.length < minNeighbors) continue;
 

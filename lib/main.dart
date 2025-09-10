@@ -4,33 +4,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'core/gn_perf.dart';
-import 'models/sheet_meta_hive.dart' as sheet_hive; // Adapter generado
+import 'models/sheet_meta_hive.dart' as sheet_hive;
 import 'screens/home_screen.dart';
 import 'services/outbox_service.dart';
 import 'theme/gridnote_theme.dart';
 import 'services/service_locator.dart';
-import 'services/permissions_service.dart'; // 👈 nuevo
+import 'services/notification_service.dart';
+import 'auth_gate.dart';
+import 'services/ai_service.dart';
+import 'widgets/smart_notifier_host.dart';
 
-/// Scroll behavior sin glow y con rebote iOS-like en todas las plataformas.
+// 👇 NUEVO: gate de licencia
+import 'widgets/license_gate.dart';
+
 class GNScrollBehavior extends MaterialScrollBehavior {
   const GNScrollBehavior({this.alwaysBounce = false});
   final bool alwaysBounce;
 
   @override
-  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
-    return child;
-  }
+  Widget buildOverscrollIndicator(
+      BuildContext context,
+      Widget child,
+      ScrollableDetails details,
+      ) =>
+      child;
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    final platform = getPlatform(context);
-    final isCupertino = platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-    if (isCupertino || alwaysBounce) {
-      return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
-    }
-    return const ClampingScrollPhysics();
+    final p = getPlatform(context);
+    final isCupertino = p == TargetPlatform.iOS || p == TargetPlatform.macOS;
+    return isCupertino || alwaysBounce
+        ? const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
+        : const ClampingScrollPhysics();
   }
 
   @override
@@ -43,13 +55,17 @@ class GNScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
 
-  // Manejo global de errores
-  bool handlingFlutterError = false;
-  bool handlingPlatformError = false;
+  final l = PlatformDispatcher.instance.locale;
+  final code =
+  l.countryCode == null ? l.languageCode : '${l.languageCode}_${l.countryCode}';
+  Intl.defaultLocale = code;
+  await initializeDateFormatting(code);
 
+  bool handlingFlutterError = false, handlingPlatformError = false;
   FlutterError.onError = (details) {
     if (handlingFlutterError) return;
     handlingFlutterError = true;
@@ -60,7 +76,6 @@ void main() async {
       handlingFlutterError = false;
     }
   };
-
   PlatformDispatcher.instance.onError = (error, stack) {
     if (handlingPlatformError) return true;
     handlingPlatformError = true;
@@ -72,27 +87,50 @@ void main() async {
     return true;
   };
 
+  ErrorWidget.builder = (details) => Material(
+    color: Colors.transparent,
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Card(
+          color: Colors.red.withValues(alpha: .08),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Ocurrió un problema.\n${details.exceptionAsString()}',
+              style: const TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   await GNPerf.bootstrap(imageCacheMb: 256);
 
-  // Hive (solo para metadatos de planillas)
   await Hive.initFlutter();
   try {
     final metaAdapter = sheet_hive.SheetMetaHiveAdapter();
     if (!Hive.isAdapterRegistered(metaAdapter.typeId)) {
       Hive.registerAdapter(metaAdapter);
     }
-  } catch (_) {
-    // Ejecutá: flutter pub run build_runner build
-  }
+  } catch (_) {}
 
   await setupServiceLocator();
   _configureLoading();
-  await OutboxService.open(autoFlushOnConnectivity: true);
 
-  // 👇 pedir permisos clave (Android 13/14+ para notifs y fotos seleccionadas)
-  await PermissionsService.instance.requestStartupPermissions();
+  // IA
+  await AiService.instance.init();
+
+  // Firebase
+  await Firebase.initializeApp();
 
   runApp(const ProviderScope(child: MyApp()));
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await OutboxService.open(autoFlushOnConnectivity: true);
+    await NotificationService.instance.init();
+  });
 }
 
 void _configureLoading() {
@@ -121,15 +159,22 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final licenseId = dotenv.maybeGet('LICENSE_ID') ?? 'trial-demo'; // 👈 lee .env
     return AnimatedBuilder(
       animation: _theme,
       builder: (_, __) {
         final t = _theme.theme;
         return MaterialApp(
-          title: 'Gridnote Measurements',
+          title: 'Bitácora',
           debugShowCheckedModeBanner: false,
           themeMode: ThemeMode.dark,
           scrollBehavior: const GNScrollBehavior(alwaysBounce: true),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('es'), Locale('es', 'AR'), Locale('en')],
           theme: ThemeData(
             useMaterial3: true,
             brightness: Brightness.dark,
@@ -139,17 +184,11 @@ class _MyAppState extends State<MyApp> {
               brightness: Brightness.dark,
               primary: t.accent,
             ),
-            appBarTheme: AppBarTheme(
-              backgroundColor: t.surface,
-              foregroundColor: t.text,
-              elevation: 0,
-            ),
+            appBarTheme:
+            AppBarTheme(backgroundColor: t.surface, foregroundColor: t.text, elevation: 0),
             cardColor: t.surface,
             dividerColor: t.divider,
-            textTheme: const TextTheme().apply(
-              bodyColor: t.text,
-              displayColor: t.text,
-            ),
+            textTheme: const TextTheme().apply(bodyColor: t.text, displayColor: t.text),
             pageTransitionsTheme: const PageTransitionsTheme(builders: {
               TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
               TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
@@ -159,8 +198,23 @@ class _MyAppState extends State<MyApp> {
               TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
             }),
           ),
-          builder: EasyLoading.init(),
-          home: HomeScreen(theme: _theme),
+          builder: (context, child) {
+            final easy = EasyLoading.init()(context, child);
+            final content = GestureDetector(
+              onTap: () {
+                final f = FocusManager.instance.primaryFocus;
+                if (f != null && f.hasFocus) f.unfocus();
+              },
+              behavior: HitTestBehavior.deferToChild,
+              child: easy,
+            );
+            return SmartNotifierHost(child: content);
+          },
+          // 👇 Envuelve todo con el LicenseGate
+          home: LicenseGate(
+            licenseId: licenseId,
+            child: AuthGate(child: HomeScreen(theme: _theme)),
+          ),
         );
       },
     );

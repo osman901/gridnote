@@ -1,0 +1,49 @@
+name: bitacora
+description: Bitácora app
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Estado / utilidades
+  flutter_riverpod: ^2.6.1
+
+  # Exportar a Excel y utilidades de archivos
+  syncfusion_flutter_xlsio: ^29.2.11
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
+  share_plus: ^10.1.4
+  path: ^1.9.1
+
+  # Multimedia y geolocalización
+  image_picker: ^1.2.0
+  geolocator: ^14.0.2
+
+  # Internacionalización (versión requerida por flutter_localizations)
+  intl: ^0.20.2
+
+  # Envío de correos / fallback
+  flutter_email_sender: ^6.0.3
+
+  # Librerías que faltaban para que compile tu código actual
+  flutter_easyloading: ^3.0.5
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

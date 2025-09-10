@@ -79,7 +79,7 @@ class PdfExportService {
 
     doc.addPage(
       pw.MultiPage(
-        pageTheme: pw.PageTheme(margin: const pw.EdgeInsets.all(24)),
+        pageTheme: const pw.PageTheme(margin: pw.EdgeInsets.all(24)),
         build: (_) => <pw.Widget>[
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -95,10 +95,10 @@ class PdfExportService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('Reporte de Gridnote', style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+                    pw.Text('Reporte de Gridnote', style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
                     pw.Text(title, style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 6),
-                    pw.Text('Generado: $nowFmt', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text('Generado: $nowFmt', style: const pw.TextStyle(fontSize: 10)),
                   ],
                 ),
               ),
@@ -112,7 +112,7 @@ class PdfExportService {
             headerDecoration: const pw.BoxDecoration(color: PdfColors.black),
             rowDecoration: const pw.BoxDecoration(color: PdfColors.white),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
-            cellStyle: pw.TextStyle(fontSize: 9),
+            cellStyle: const pw.TextStyle(fontSize: 9),
             headerAlignments: headerAlignments,
             cellAlignments: cellAlignments,
             columnWidths: columnWidths,

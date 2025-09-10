@@ -10,16 +10,21 @@ import '../models/measurement.dart';
 import '../models/sheet_meta.dart';
 import '../services/audit_log_service.dart';
 import '../services/suggest_service.dart';
-import '../services/validation_rules.dart';       // defaultRules()
-import '../services/smart_assistant.dart';        // GridnoteAssistant
+import '../services/validation_rules.dart';
+import '../services/smart_assistant.dart';
 import '../theme/gridnote_theme.dart';
 import '../viewmodels/sheet_view_model.dart';
-import '../widgets/measurement_pluto_grid.dart';
+import '../widgets/measurement_pluto_grid.dart' as mg; // MeasurementDataGrid + Controller
+import '../widgets/measurement_columns.dart' show MeasurementColumn;
 import '../widgets/value_listenable_builder_2.dart';
 import '../widgets/form_view.dart';
 import '../widgets/chart_dialog.dart';
 import '../services/elite_assistant.dart';
 import '../services/service_locator.dart';
+
+// Extras: guardar manual y Ajustes
+import '../services/outbox_service.dart';
+import 'settings_screen.dart';
 
 class SheetScreen extends StatefulWidget {
   const SheetScreen({
@@ -46,11 +51,12 @@ class _SheetScreenState extends State<SheetScreen> {
   late final TextEditingController _searchCtrl;
 
   late final SheetViewModel _vm;
-  final _gridCtrl = MeasurementGridController();
-
   bool get _isIOS => defaultTargetPlatform == TargetPlatform.iOS;
 
   GridnoteAssistant? _assistant;
+
+  // Controlador de la grilla
+  final mg.MeasurementGridController _grid = mg.MeasurementGridController();
 
   @override
   void initState() {
@@ -65,9 +71,7 @@ class _SheetScreenState extends State<SheetScreen> {
       audit: getIt<AuditLogService>(param1: widget.meta.id),
       onSnack: _snack,
       onTitleChanged: (v) => widget.onTitleChanged?.call(v),
-    );
-
-    _vm.init();
+    )..init();
 
     EliteAssistant.forSheet(widget.meta.id).then((a) {
       if (!mounted) return;
@@ -96,7 +100,22 @@ class _SheetScreenState extends State<SheetScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // === Share menu ===
+  // ---------- FILTRADO (para exportaciones / gráfico) ----------
+  List<Measurement> _visibleRowsNow() {
+    final q = _vm.searchQuery.value.trim().toLowerCase();
+    final rows = _vm.measurements.value;
+    if (q.isEmpty) return rows;
+    bool match(Measurement m) {
+      if (m.progresiva.toLowerCase().contains(q)) return true;
+      if (m.observations.toLowerCase().contains(q)) return true;
+      if ('${m.ohm1m}'.contains(q)) return true;
+      if ('${m.ohm3m}'.contains(q)) return true;
+      return false;
+    }
+    return rows.where(match).toList();
+  }
+
+  // ---------- Compartir / Exportar ----------
   Widget _shareMenuButton() {
     if (_isIOS) {
       return ValueListenableBuilder<bool>(
@@ -121,32 +140,28 @@ class _SheetScreenState extends State<SheetScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [Icon(Icons.ios_share_outlined), SizedBox(width: 8), Text('Exportar')],
         );
-        final button = IgnorePointer(
-          ignoring: true,
-          child: FilledButton.tonal(onPressed: () {}, child: child),
-        );
+        final button = IgnorePointer(ignoring: true, child: FilledButton.tonal(onPressed: () {}, child: child));
         return PopupMenuButton<String>(
           tooltip: 'Compartir / Exportar',
           enabled: !busy,
           onSelected: (v) async {
-            final visibleRows = _gridCtrl.snapshot();
             switch (v) {
               case 'send_visible_xlsx':
                 final email = await _askForEmail();
-                if (email != null) await _vm.shareViaEmailXlsx(rows: visibleRows, email: email);
+                if (email != null) await _vm.shareViaEmailXlsx(rows: _visibleRowsNow(), email: email);
                 break;
               case 'send_all_xlsx':
                 final email2 = await _askForEmail();
                 if (email2 != null) await _vm.shareViaEmailXlsx(rows: _vm.measurements.value, email: email2);
                 break;
               case 'export_visible_csv':
-                await _vm.shareCsv(rows: visibleRows);
+                await _vm.shareCsv(rows: _visibleRowsNow());
                 break;
               case 'export_all_csv':
                 await _vm.shareCsv(rows: _vm.measurements.value);
                 break;
               case 'export_pdf_visible':
-                await _vm.exportPdf(rows: visibleRows);
+                await _vm.exportPdf(rows: _visibleRowsNow());
                 break;
               case 'export_pdf_all':
                 await _vm.exportPdf(rows: _vm.measurements.value);
@@ -197,7 +212,7 @@ class _SheetScreenState extends State<SheetScreen> {
             onPressed: () async {
               Navigator.pop(context);
               final email = await _askForEmail();
-              if (email != null) await _vm.shareViaEmailXlsx(rows: _gridCtrl.snapshot(), email: email);
+              if (email != null) await _vm.shareViaEmailXlsx(rows: _visibleRowsNow(), email: email);
             },
             child: const Text('Enviar XLSX (solo visible)'),
           ),
@@ -212,7 +227,7 @@ class _SheetScreenState extends State<SheetScreen> {
           CupertinoActionSheetAction(
             onPressed: () async {
               Navigator.pop(context);
-              await _vm.shareCsv(rows: _gridCtrl.snapshot());
+              await _vm.shareCsv(rows: _visibleRowsNow());
             },
             child: const Text('Exportar CSV (solo visible)'),
           ),
@@ -226,7 +241,7 @@ class _SheetScreenState extends State<SheetScreen> {
           CupertinoActionSheetAction(
             onPressed: () async {
               Navigator.pop(context);
-              await _vm.exportPdf(rows: _gridCtrl.snapshot());
+              await _vm.exportPdf(rows: _visibleRowsNow());
             },
             child: const Text('Exportar PDF (solo visible)'),
           ),
@@ -238,7 +253,6 @@ class _SheetScreenState extends State<SheetScreen> {
             child: const Text('Exportar PDF (todas)'),
           ),
         ],
-        // ✅ onPressed no nulo y sin const para evitar error de tipo
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
           isDefaultAction: true,
@@ -341,28 +355,15 @@ class _SheetScreenState extends State<SheetScreen> {
     backgroundColor: surface,
   );
 
-  Widget _iosViewSegment() {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _vm.formView,
-      builder: (_, isForm, __) {
-        return CupertinoSlidingSegmentedControl<int>(
-          groupValue: isForm ? 1 : 0,
-          children: const {
-            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Tabla')),
-            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Formulario')),
-          },
-          onValueChanged: (v) => _vm.formView.value = (v ?? 0) == 1,
-        );
-      },
-    );
-  }
-
   Future<void> _showLocationSheet() async {
-    final la = _vm.lat.value, lo = _vm.lng.value;
-    if (la == null || lo == null) {
+    final la0 = _vm.lat.value, lo0 = _vm.lng.value;
+    if (la0 == null || lo0 == null) {
       await _vm.saveLocation();
       return;
     }
+    final double la = la0;
+    final double lo = lo0;
+
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -420,6 +421,22 @@ class _SheetScreenState extends State<SheetScreen> {
     );
   }
 
+  Widget _iosViewSegment() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _vm.formView,
+      builder: (_, isForm, __) {
+        return CupertinoSlidingSegmentedControl<int>(
+          groupValue: isForm ? 1 : 0,
+          children: const {
+            0: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Tabla')),
+            1: Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6), child: Text('Formulario')),
+          },
+          onValueChanged: (v) => _vm.formView.value = (v ?? 0) == 1,
+        );
+      },
+    );
+  }
+
   Widget _toolsBar(GridnoteTheme t) {
     return Wrap(
       spacing: 8,
@@ -468,9 +485,38 @@ class _SheetScreenState extends State<SheetScreen> {
           },
         ),
         OutlinedButton.icon(
-          onPressed: () => showChartDialog(context, _gridCtrl.snapshot()),
+          onPressed: () => showChartDialog(context, _visibleRowsNow()),
           icon: const Icon(Icons.show_chart_outlined),
           label: const Text('Gráfico'),
+        ),
+        // Extras: Fotos / Guardar / Ajustes
+        OutlinedButton.icon(
+          onPressed: () {
+            _snack('Abrir fotos (galería / cámara)');
+          },
+          icon: const Icon(Icons.photo_library_outlined),
+          label: const Text('Fotos'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              await OutboxService.instance.flush();
+              _snack('Cambios guardados');
+            } catch (_) {
+              _snack('No se pudo guardar ahora');
+            }
+          },
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('Guardar'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+          icon: const Icon(Icons.settings_outlined),
+          label: const Text('Ajustes'),
         ),
         if (_assistant != null)
           const Chip(
@@ -571,10 +617,11 @@ class _SheetScreenState extends State<SheetScreen> {
       },
     );
 
-    final counts = ValueListenableBuilder<List<Measurement>>(
-      valueListenable: _vm.measurements,
-      builder: (_, rows, __) {
-        final visible = _gridCtrl.snapshot().length;
+    final counts = ValueListenableBuilder2<List<Measurement>, String>(
+      first: _vm.measurements,
+      second: _vm.searchQuery,
+      builder: (_, rows, q, __) {
+        final visible = _visibleRowsNow().length;
         final total = rows.length;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -632,6 +679,11 @@ class _SheetScreenState extends State<SheetScreen> {
     );
   }
 
+  // Placeholder para “editor avanzado” de encabezados
+  void _editHeader(String field) {
+    _snack('Editar encabezado: $field');
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -680,7 +732,6 @@ class _SheetScreenState extends State<SheetScreen> {
                   ),
                 ),
             ],
-            // bottom debe ser PreferredSizeWidget
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(2),
               child: ValueListenableBuilder<bool>(
@@ -712,51 +763,38 @@ class _SheetScreenState extends State<SheetScreen> {
                           },
                         );
                       }
-                      return ValueListenableBuilder2<List<Measurement>, Map<String, String>>(
+
+                      // GRID NUEVA (MeasurementDataGrid)
+                      return ValueListenableBuilder2<List<Measurement>, String>(
                         first: _vm.measurements,
-                        second: _vm.headers,
-                        builder: (_, rows, headerTitles, __) {
-                          return ValueListenableBuilder<String>(
-                            valueListenable: _vm.searchQuery,
-                            builder: (_, q, __) {
-                              return MeasurementDataGrid(
-                                meta: widget.meta,
-                                initial: rows,
-                                themeController: widget.themeController,
-                                controller: _gridCtrl,
-                                autoWidth: true,
-                                filterQuery: q,
-                                headerTitles: headerTitles,
-                                onEditHeader: (col) async {
-                                  final ctl = TextEditingController(text: headerTitles[col] ?? '');
-                                  final txt = await showDialog<String>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('Renombrar encabezado'),
-                                      content: TextField(
-                                        controller: ctl,
-                                        autofocus: true,
-                                        decoration:
-                                        const InputDecoration(hintText: 'Nuevo título (puede quedar vacío)'),
-                                      ),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                                        FilledButton(
-                                          onPressed: () => Navigator.pop(ctx, ctl.text.trim()),
-                                          child: const Text('Guardar'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (txt != null) await _vm.setHeaderTitle(col, txt);
-                                },
-                                onOpenMaps: (m) => _vm.openMapsFor(
-                                  latParam: m.latitude ?? _vm.lat.value,
-                                  lngParam: m.longitude ?? _vm.lng.value,
-                                ),
-                                onChanged: (next) => _vm.replaceRows(next),
-                              );
+                        second: _vm.searchQuery,
+                        builder: (_, rows, q, __) {
+                          return mg.MeasurementDataGrid(
+                            meta: widget.meta,
+                            initial: rows,
+                            themeController: widget.themeController,
+                            controller: _grid,
+                            onChanged: (next) => _vm.replaceRows(next),
+                            headerTitles: const {
+                              MeasurementColumn.progresiva: 'Progresiva',
+                              MeasurementColumn.ohm1m: '1m (Ω)',
+                              MeasurementColumn.ohm3m: '3m (Ω)',
+                              MeasurementColumn.observations: 'Obs',
+                              MeasurementColumn.date: 'Fecha',
                             },
+                            onEditHeader: _editHeader,
+                            onHeaderTitleChanged: (field, title) {
+                              // si querés persistir el título, hacelo acá
+                            },
+                            onOpenMaps: (m) {
+                              final la = m.latitude, lo = m.longitude;
+                              if (la != null && lo != null) {
+                                _vm.openMapsFor(latParam: la, lngParam: lo);
+                              }
+                            },
+                            filterQuery: q,
+                            aiEnabled: true,
+                            showPhotoRail: true,
                           );
                         },
                       );
@@ -782,3 +820,4 @@ class _SheetScreenState extends State<SheetScreen> {
     );
   }
 }
+

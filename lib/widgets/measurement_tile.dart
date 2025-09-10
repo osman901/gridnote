@@ -59,18 +59,17 @@ class MeasurementTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        if (measurement.ohm1m != null)
-                          Text(
-                            '1mΩ: ${measurement.ohm1m}',
-                            style: TextStyle(color: theme.textFaint, fontSize: 12),
-                          ),
-                        if (measurement.ohm3m != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '3mΩ: ${measurement.ohm3m}',
-                            style: TextStyle(color: theme.textFaint, fontSize: 12),
-                          ),
-                        ],
+                        Text(
+                          '1mΩ: ${measurement.ohm1m}',
+                          style: TextStyle(color: theme.textFaint, fontSize: 12),
+                        ),
+                        ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '3mΩ: ${measurement.ohm3m}',
+                          style: TextStyle(color: theme.textFaint, fontSize: 12),
+                        ),
+                      ],
                       ],
                     ),
                   ],

@@ -1,4 +1,3 @@
-// lib/services/xlsx_export_service.dart
 import 'dart:io';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xls;
 import 'package:path_provider/path_provider.dart';
@@ -8,11 +7,12 @@ import '../services/photo_store.dart';
 
 class XlsxExportService {
   static const List<String> _fallbackHeaders = <String>[
-    'Fecha', 'Progresiva', '1m (Ω)', '3m (Ω)', 'Observaciones', 'Lat', 'Lng'
+    'Fecha', 'Progresiva', '1m (Ω)', '3m (Ω)', 'Observaciones', 'Ubicación'
   ];
 
   /// Genera un XLSX con dos hojas:
-  /// - "Datos": tabla con las mediciones.
+  /// - "Datos": tabla con las mediciones. La columna "Ubicación" contiene
+  ///   un link clickeable a Google Maps por fila.
   /// - "Fotos": mini-galería embebida por fila.
   Future<File> buildFile({
     required String sheetId,
@@ -22,6 +22,7 @@ class XlsxExportService {
     double? defaultLng,
     List<String>? headers,
   }) async {
+    // Normaliza coordenadas con defaults si faltan.
     final normalized = data
         .map((m) => (m.latitude == null && defaultLat != null) ||
         (m.longitude == null && defaultLng != null)
@@ -33,46 +34,58 @@ class XlsxExportService {
         .toList(growable: false);
 
     final book = xls.Workbook();
+
+    // ================= Hoja Datos =================
     final ws = book.worksheets[0];
     ws.name = 'Datos';
 
-    // Encabezados
     final cols = (headers != null && headers.isNotEmpty) ? headers : _fallbackHeaders;
     for (var c = 0; c < cols.length; c++) {
-      ws.getRangeByIndex(1, c + 1).setText(cols[c]);
-      ws.getRangeByIndex(1, c + 1).cellStyle.bold = true;
+      final cell = ws.getRangeByIndex(1, c + 1);
+      cell.setText(cols[c]);
+      cell.cellStyle.bold = true;
     }
 
-    String _fmtDate(DateTime? dt) {
+    String fmtDate(DateTime? dt) {
       if (dt == null) return '';
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
     }
 
-    // Filas
     for (var i = 0; i < normalized.length; i++) {
       final r = i + 2;
       final m = normalized[i];
-      ws.getRangeByIndex(r, 1).setText(_fmtDate(m.date));
+
+      ws.getRangeByIndex(r, 1).setText(fmtDate(m.date));
       ws.getRangeByIndex(r, 2).setText(m.progresiva);
-      ws.getRangeByIndex(r, 3).setNumber((m.ohm1m ?? 0).toDouble());
-      ws.getRangeByIndex(r, 4).setNumber((m.ohm3m ?? 0).toDouble());
-      ws.getRangeByIndex(r, 5).setText(m.observations ?? '');
-      if (m.latitude != null) ws.getRangeByIndex(r, 6).setNumber(m.latitude!);
-      if (m.longitude != null) ws.getRangeByIndex(r, 7).setNumber(m.longitude!);
+      ws.getRangeByIndex(r, 3).setNumber(m.ohm1m.toDouble());
+      ws.getRangeByIndex(r, 4).setNumber(m.ohm3m.toDouble());
+      ws.getRangeByIndex(r, 5).setText(m.observations);
+
+      // Columna 6: “Ubicación” con hyperlink si hay coords
+      final lat = m.latitude;
+      final lng = m.longitude;
+      final locCell = ws.getRangeByIndex(r, 6);
+      if (lat != null && lng != null) {
+        final url = _mapsUrl(lat, lng);
+        final link = ws.hyperlinks.add(locCell, xls.HyperlinkType.url, url);
+        link.textToDisplay = 'Enlace ubicación';
+      } else {
+        locCell.setText('');
+      }
     }
 
-    // Hoja de fotos
+    // ================= Hoja Fotos =================
     final fotos = book.worksheets.addWithName('Fotos');
     fotos.getRangeByIndex(1, 1).setText('Progresiva');
     fotos.getRangeByIndex(1, 2).setText('Foto #');
     fotos.getRangeByIndex(1, 3).setText('Imagen');
-    fotos.getRangeByIndex(1, 1).cellStyle.bold = true;
-    fotos.getRangeByIndex(1, 2).cellStyle.bold = true;
-    fotos.getRangeByIndex(1, 3).cellStyle.bold = true;
+    for (var c = 1; c <= 3; c++) {
+      fotos.getRangeByIndex(1, c).cellStyle.bold = true;
+    }
 
     var rowPix = 2;
     for (final m in normalized) {
-      final rid = m.id ?? '';
+      final int rid = m.id ?? 0;
       final files = await PhotoStore.list(sheetId, rid);
       if (files.isEmpty) continue;
 
@@ -86,7 +99,7 @@ class XlsxExportService {
         pic.height = 180;
         pic.width = 240;
 
-        rowPix += 8; // separador vertical
+        rowPix += 8; // separación visual
         idx++;
       }
     }
@@ -94,13 +107,15 @@ class XlsxExportService {
     final bytes = book.saveAsStream();
     book.dispose();
 
-    // Guardamos en Support (seguro y privado)
+    // Guardamos en ApplicationSupportDirectory (privado)
     final dir = await getApplicationSupportDirectory();
-    final safeName = _safe('${title}_xlsx');
-    final out = File('${dir.path}/$safeName');
+    final out = File('${dir.path}/${_safe('${title}_xlsx')}');
     await out.writeAsBytes(bytes, flush: true);
     return out;
   }
+
+  static String _mapsUrl(double lat, double lng) =>
+      'https://www.google.com/maps/search/?api=1&query=${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
 
   static String _safe(String name) {
     var n = name.trim().isEmpty ? 'gridnote' : name.trim();

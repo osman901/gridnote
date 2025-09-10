@@ -1,15 +1,21 @@
-// lib/ai/elite_assistant.dart
-// EliteAssistant – versión “beta-ready”
-// - IA offline con aprendizaje incremental (Hive)
-// - Outliers con z-score y ratio configurables (persistidos)
-// - Cacheo de estadísticas por sesión con enfriamiento para alta performance
-// - Autocompletado y normalización robusta
-// - Soporte opcional para LLM externo (inyectable)
+// EliteAssistant – orchestrator with Strategy pattern
+// - Persistence via Hive and session statistics cache
+// - Configurable thresholds (z-score, ratio)
+// - Public helpers for strategies to access “memory”
+// - Delegation to strategies per column
 
 import 'dart:math' as math;
 import 'package:hive/hive.dart';
+
 import '../models/measurement.dart';
 import 'smart_assistant.dart';
+
+// Strategies
+import 'strategies/column_strategy.dart';
+import 'strategies/progresiva_strategy.dart';
+import 'strategies/numeric_ohm_strategy.dart';
+import 'strategies/observation_strategy.dart';
+import 'strategies/date_strategy.dart';
 
 typedef LlmSuggestFn = Future<String?> Function({
 required String column,
@@ -17,14 +23,24 @@ required String contextText,
 });
 
 class EliteAssistant implements GridnoteAssistant {
-  EliteAssistant._(this._boxName, {this.llmSuggest});
+  EliteAssistant._(this._boxName, {this.llmSuggest}) {
+    _strategies = <ColumnStrategy>[
+      ProgresivaStrategy(this),
+      NumericOhmStrategy(this),
+      ObservationStrategy(this),
+      DateStrategy(this),
+    ];
+  }
+
   final String _boxName;
   final LlmSuggestFn? llmSuggest;
 
-  // ===== Persistencia (Hive) =====
+  late final List<ColumnStrategy> _strategies;
+
+  // ====== Persistence (Hive) ======
   static const _kStats = 'stats';
   static const _kConfig = 'config';
-  static const _kCorrPrefix = 'corr.'; // correcciones aprendidas por columna
+  static const _kCorrPrefix = 'corr.'; // corrections per column
 
   Box<Map>? _box;
 
@@ -50,23 +66,20 @@ class EliteAssistant implements GridnoteAssistant {
   Future<void> _setConfig(Map c) async =>
       _box?.put(_kConfig, Map<String, dynamic>.from(c));
 
-  // ===== Umbrales configurables (persistidos) =====
-  double get zThreshold =>
-      ((_config['zThreshold'] ?? 3.0) as num).toDouble();
-  double get minRatio =>
-      ((_config['minRatio'] ?? 0.5) as num).toDouble();
-  double get maxRatio =>
-      ((_config['maxRatio'] ?? 1.5) as num).toDouble();
+  // ====== Configurable thresholds ======
+  double get zThreshold => ((_config['zThreshold'] ?? 3.0) as num).toDouble();
+  double get minRatio   => ((_config['minRatio']   ?? 0.5) as num).toDouble();
+  double get maxRatio   => ((_config['maxRatio']   ?? 1.5) as num).toDouble();
 
   void setOutlierThresholds({double? zThreshold, double? minRatio, double? maxRatio}) {
     final c = Map<String, dynamic>.from(_config);
     if (zThreshold != null) c['zThreshold'] = zThreshold;
-    if (minRatio != null) c['minRatio'] = minRatio;
-    if (maxRatio != null) c['maxRatio'] = maxRatio;
+    if (minRatio   != null) c['minRatio']   = minRatio;
+    if (maxRatio   != null) c['maxRatio']   = maxRatio;
     _setConfig(c);
   }
 
-  // ===== Construcción =====
+  // ====== Construction ======
   static Future<EliteAssistant> forSheet(
       String sheetId, {
         LlmSuggestFn? llmSuggest,
@@ -76,8 +89,7 @@ class EliteAssistant implements GridnoteAssistant {
     return a;
   }
 
-  // ===== Cache de estadísticas de sesión =====
-  // Recalcula a lo sumo cada _statsCooldown o si cambia la longitud.
+  // ====== Session statistics cache ======
   final Duration _statsCooldown = const Duration(milliseconds: 350);
   DateTime _lastStatsAt = DateTime.fromMillisecondsSinceEpoch(0);
   int _sessionLen = -1;
@@ -91,7 +103,7 @@ class EliteAssistant implements GridnoteAssistant {
         now.difference(_lastStatsAt) < _statsCooldown && len == _sessionLen;
     if (stillFresh) return;
 
-    List<double> _col(String col) {
+    List<double> col(String col) {
       final vals = <double>[];
       for (final r in ctx.rows) {
         final v = (col == 'ohm1m'
@@ -103,7 +115,7 @@ class EliteAssistant implements GridnoteAssistant {
       return vals;
     }
 
-    (double mean, double std) _statsFor(List<double> serie) {
+    (double mean, double std) statsFor(List<double> serie) {
       if (serie.length < 5) return (double.nan, double.nan);
       final n = serie.length.toDouble();
       final sum = serie.fold<double>(0, (a, b) => a + b);
@@ -118,11 +130,11 @@ class EliteAssistant implements GridnoteAssistant {
       return (mean, std);
     }
 
-    final s1 = _col('ohm1m');
-    final s3 = _col('ohm3m');
+    final s1 = col('ohm1m');
+    final s3 = col('ohm3m');
 
-    final (m1, sd1) = _statsFor(s1);
-    final (m3, sd3) = _statsFor(s3);
+    final (m1, sd1) = statsFor(s1);
+    final (m3, sd3) = statsFor(s3);
 
     _sessionMeans['ohm1m'] = m1;
     _sessionMeans['ohm3m'] = m3;
@@ -133,7 +145,7 @@ class EliteAssistant implements GridnoteAssistant {
     _lastStatsAt = now;
   }
 
-  // ===== Aprendizaje incremental de uso =====
+  // ====== Incremental learning ======
   void learn(Measurement m) {
     final s = Map<String, dynamic>.from(_stats);
 
@@ -147,8 +159,7 @@ class EliteAssistant implements GridnoteAssistant {
     }
 
     void bump(String k, String v) {
-      final map = Map<String, int>.from(
-          (s[k] ?? <String, int>{}) as Map? ?? {});
+      final map = Map<String, int>.from((s[k] ?? <String, int>{}) as Map? ?? {});
       final vv = v.trim();
       if (vv.isEmpty) return;
       map[vv] = (map[vv] ?? 0) + 1;
@@ -167,6 +178,22 @@ class EliteAssistant implements GridnoteAssistant {
     _setStats(s);
   }
 
+  // ====== Transform: delegate to strategy ======
+  @override
+  Future<AiResult> transform(AiCellContext ctx) async {
+    await _ensure();
+    _ensureSessionStats(ctx);
+    final col = ctx.columnName;
+    for (final s in _strategies) {
+      if (s.canHandle(col)) {
+        return s.transform(ctx);
+      }
+    }
+    final raw = (ctx.rawInput ?? '').toString().trim();
+    return AiResult.accept(raw);
+  }
+
+  // ====== Private utilities ======
   double _historicalMean(String k, double def) =>
       ((_stats['$k.mean'] ?? def) as num).toDouble();
 
@@ -178,161 +205,6 @@ class EliteAssistant implements GridnoteAssistant {
     return items.take(k).map((e) => e.key).toList();
   }
 
-  // ===== Núcleo =====
-  @override
-  Future<AiResult> transform(AiCellContext ctx) async {
-    await _ensure();
-    final col = ctx.columnName;
-    final raw = (ctx.rawInput ?? '').toString().trim();
-
-    // Mantener stats de sesión frescas (barato por enfriamiento)
-    _ensureSessionStats(ctx);
-
-    // --- PROGRESIVA ---
-    if (col == 'progresiva') {
-      if (raw.isEmpty) {
-        final prev = (ctx.rowIndex > 0 && ctx.rows.length > ctx.rowIndex)
-            ? ctx.rows[ctx.rowIndex - 1].progresiva
-            : '';
-        if (prev.isNotEmpty) {
-          final nextCode = _incCode(prev);
-          final modes = _topPhrases('progresiva.mode');
-          return AiResult.accept(
-            nextCode,
-            hint: _mkHint([
-              'Autocompletado: $nextCode',
-              if (modes.isNotEmpty) 'Frecuentes: ${modes.join(' · ')}',
-            ]),
-          );
-        }
-        final modes = _topPhrases('progresiva.mode');
-        return AiResult.accept(
-          '',
-          hint: _mkHint([
-            if (modes.isNotEmpty) 'Usadas: ${modes.join(' · ')}',
-            'Tip: KP-001 → KP-002',
-          ]),
-        );
-      }
-      final fixed =
-      raw.replaceAll(RegExp(r'\s+'), '').replaceAll('--', '-');
-      if (fixed != raw) _rememberCorrection(col, raw, fixed);
-      return AiResult.accept(fixed, hint: 'OK');
-    }
-
-    // --- NÚMEROS (ohm1m / ohm3m) ---
-    if (col == 'ohm1m' || col == 'ohm3m') {
-      final norm = _normalizeNumber(raw);
-      final v = double.tryParse(norm);
-      if (v == null) {
-        final learned = _lookupCorrection(col, raw);
-        final cands = _numericCandidates(raw);
-        final msg = [
-          'Número inválido',
-          if (learned != null) 'Aprendido: $learned',
-          if (cands.isNotEmpty) 'Quizás: ${cands.join(' · ')}',
-        ].join(' · ');
-        return AiResult.reject(msg);
-      }
-
-      final clamped = v.clamp(0.0, 999999.0).toDouble();
-
-      // Media histórica (persistida) para contexto de usuario
-      final histMean = _historicalMean(col, clamped);
-
-      // z-score basado en stats de sesión (rápido por cache)
-      final sessMean = _sessionMeans[col] ?? double.nan;
-      final sessStd = _sessionStdDevs[col] ?? double.nan;
-      double z = double.nan;
-      if (!sessMean.isNaN && sessStd.isFinite && sessStd > 0) {
-        z = (clamped - sessMean) / sessStd;
-      }
-
-      final extras = <String>[
-        'Promedio histórico: ${histMean.toStringAsFixed(2)}',
-        if (!z.isNaN && z.abs() >= zThreshold)
-          'Muy fuera de rango (≥${zThreshold.toStringAsFixed(1)}σ)'
-        else if (!z.isNaN && z.abs() >= zThreshold * 2 / 3)
-          'Atención: outlier (z=${z.toStringAsFixed(2)})',
-      ];
-
-      final r = _ratio(ctx);
-      if (r != null) {
-        if (r > maxRatio || r < minRatio) {
-          extras.add('Relación 3m/1m fuera de límites');
-        } else {
-          extras.add('Relación 3m/1m≈${r.toStringAsFixed(2)}');
-        }
-      }
-
-      if (norm != raw) _rememberCorrection(col, raw, norm);
-      _teachRunning(col, clamped);
-
-      return AiResult.accept(clamped, hint: _mkHint(extras));
-    }
-
-    // --- OBSERVATIONS (predicción corta) ---
-    if (col == 'observations') {
-      if (raw.isNotEmpty) {
-        _bumpPhrase('obs.mode', raw);
-        return AiResult.accept(raw, hint: _mkHint(_obsHints(ctx)));
-      }
-
-      final prev1 = (ctx.rows[ctx.rowIndex].ohm1m as num?)?.toDouble();
-      final prev3 = (ctx.rows[ctx.rowIndex].ohm3m as num?)?.toDouble();
-      final mean1 = _historicalMean('ohm1m', prev1 ?? 0);
-      final mean3 = _historicalMean('ohm3m', prev3 ?? 0);
-      final ok = ((prev1 ?? mean1) <= mean1 * 1.15) &&
-          ((prev3 ?? mean3) <= mean3 * 1.15);
-
-      final top = _topPhrases('obs.mode');
-      final base = ok ? 'OK' : 'Revisar';
-      final localGuess =
-      (top.isNotEmpty && top.first != base) ? top.first : base;
-
-      // LLM opcional
-      String? llmSuggestion;
-      final call = llmSuggest;
-      if (call != null) {
-        final res = await call(
-          column: 'observations',
-          contextText: _mkObservationsPrompt(ctx, fallback: localGuess),
-        );
-        var cleaned = res?.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
-        if (cleaned != null && cleaned.length > 48) {
-          cleaned = cleaned.substring(0, 48).trim();
-        }
-        llmSuggestion = cleaned;
-      }
-      final chosen = (llmSuggestion != null && llmSuggestion.isNotEmpty)
-          ? llmSuggestion
-          : localGuess;
-
-      _bumpPhrase('obs.mode', chosen);
-      return AiResult.accept(
-        chosen,
-        hint: _mkHint([
-          if (ok) 'Dentro de rango' else 'Sobre promedio',
-          if (top.isNotEmpty) 'Frecuentes: ${top.join(' · ')}',
-          if (llmSuggestion != null) 'LLM: $llmSuggestion',
-        ]),
-      );
-    }
-
-    // --- FECHA ---
-    if (col == 'date') {
-      if (raw.isEmpty) return AiResult.accept(DateTime.now(), hint: 'Hoy');
-      final d = _parseDate(raw);
-      return (d == null)
-          ? AiResult.reject('Fecha inválida (dd/mm/aaaa)')
-          : AiResult.accept(d, hint: 'OK');
-    }
-
-    // Default (eco con normalización básica si aplica)
-    return AiResult.accept(raw);
-  }
-
-  // ===== Razón/consistencia auxiliar =====
   double? _ratio(AiCellContext ctx) {
     final a = (ctx.rows[ctx.rowIndex].ohm1m as num?)?.toDouble();
     final b = (ctx.rows[ctx.rowIndex].ohm3m as num?)?.toDouble();
@@ -340,17 +212,6 @@ class EliteAssistant implements GridnoteAssistant {
     return b / a;
   }
 
-  List<String> _obsHints(AiCellContext ctx) {
-    final hints = <String>[];
-    final r = _ratio(ctx);
-    if (r != null) {
-      if (r > maxRatio) hints.add('3m muy alto vs 1m → verificar conexión');
-      if (r < minRatio) hints.add('3m muy bajo vs 1m → revisar medición');
-    }
-    return hints;
-  }
-
-  // ===== Normalizaciones & utilitarios =====
   String _normalizeNumber(String raw) {
     var s = raw.trim().toLowerCase();
     s = s.replaceAll(',', '.');
@@ -382,8 +243,8 @@ class EliteAssistant implements GridnoteAssistant {
 
   void _bumpPhrase(String key, String phrase) {
     final s = Map<String, dynamic>.from(_stats);
-    final map =
-    Map<String, int>.from((s[key] ?? <String, int>{}) as Map? ?? {});
+    final map = Map<String, int>.from(
+        (s[key] ?? <String, int>{}) as Map? ?? {});
     final norm = phrase.trim();
     if (norm.isEmpty) return;
     map[norm] = (map[norm] ?? 0) + 1;
@@ -394,7 +255,8 @@ class EliteAssistant implements GridnoteAssistant {
   void _rememberCorrection(String col, String raw, String fixed) {
     final key = '$_kCorrPrefix$col';
     final s = Map<String, dynamic>.from(_stats);
-    final map = Map<String, String>.from((s[key] ?? const <String, String>{}) as Map? ?? {});
+    final map =
+    Map<String, String>.from((s[key] ?? const <String, String>{}) as Map? ?? {});
     final r = raw.trim();
     final f = fixed.trim();
     if (r.isEmpty || f.isEmpty) return;
@@ -406,12 +268,12 @@ class EliteAssistant implements GridnoteAssistant {
   String? _lookupCorrection(String col, String raw) {
     final key = '$_kCorrPrefix$col';
     final s = Map<String, dynamic>.from(_stats);
-    final map = Map<String, String>.from((s[key] ?? const <String, String>{}) as Map? ?? {});
+    final map =
+    Map<String, String>.from((s[key] ?? const <String, String>{}) as Map? ?? {});
     return map[raw.trim()];
   }
 
   String _incCode(String code) {
-    // BUGFIX: quitar '\$' literal -> anclar con '$'
     final re = RegExp(r'^(.*?)(\d+)([A-Za-z]*)$');
     final m = re.firstMatch(code);
     if (m == null) return code;
@@ -425,7 +287,6 @@ class EliteAssistant implements GridnoteAssistant {
 
   DateTime? _parseDate(String raw) {
     final r = raw.replaceAll('-', '/');
-    // BUGFIX: quitar '\$' literal -> anclar con '$'
     final m = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{2,4})$').firstMatch(r);
     if (m == null) return null;
     final d = int.parse(m.group(1)!);
@@ -450,7 +311,7 @@ class EliteAssistant implements GridnoteAssistant {
     String fmt(num? v) => v == null ? '-' : v.toStringAsFixed(3);
 
     return '''
-Sos un asistente de planillas tipo Excel. Proponé una observación corta y útil (máx 4 palabras).
+Sos un asistente de planillas. Proponé una observación corta y útil (máx 4 palabras).
 Datos:
 - ohm1m=${fmt(d1)} (Δ=${delta1.toStringAsFixed(3)})
 - ohm3m=${fmt(d3)} (Δ=${delta3.toStringAsFixed(3)})
@@ -459,4 +320,24 @@ Si todo está normal, sugerí "OK". Si está alto, sugerí "Revisar".
 Si dudás, devolvé: $fallback
 ''';
   }
+
+  // ====== Public helpers for strategies ======
+  double historicalMean(String k, double def) => _historicalMean(k, def);
+  List<String> topPhrases(String key, {int k = 3}) => _topPhrases(key, k: k);
+  String normalizeNumber(String raw) => _normalizeNumber(raw);
+  List<String> numericCandidates(String raw) => _numericCandidates(raw);
+  void rememberCorrection(String col, String raw, String fixed) =>
+      _rememberCorrection(col, raw, fixed);
+  String incCode(String code) => _incCode(code);
+  String mkHint(List<String> parts) => _mkHint(parts);
+  double? ratio(AiCellContext ctx) => _ratio(ctx);
+  void teachRunning(String col, double v) => _teachRunning(col, v);
+  double? sessionMean(String col) => _sessionMeans[col];
+  double? sessionStdDev(String col) => _sessionStdDevs[col];
+  String? lookupCorrection(String col, String raw) =>
+      _lookupCorrection(col, raw);
+  DateTime? parseDate(String raw) => _parseDate(raw);
+  String mkObservationsPrompt(AiCellContext ctx, {required String fallback}) =>
+      _mkObservationsPrompt(ctx, fallback: fallback);
+  void bumpPhrase(String key, String phrase) => _bumpPhrase(key, phrase);
 }

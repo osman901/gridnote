@@ -8,10 +8,10 @@ Future<void> showChartDialog(BuildContext context, List<Measurement> rows) async
   String y = 'ohm1m'; // ohm1m | ohm3m
   String type = 'line'; // line | bar
 
-  List<DropdownMenuItem<String>> _items(List<String> v) =>
+  List<DropdownMenuItem<String>> items(List<String> v) =>
       v.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList();
 
-  List<FlSpot> _spots() {
+  List<FlSpot> spots() {
     final sorted = List<Measurement>.from(rows)
       ..sort((a, b) => a.date.compareTo(b.date));
     double idx = 0;
@@ -44,8 +44,8 @@ Future<void> showChartDialog(BuildContext context, List<Measurement> rows) async
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: x,
-                          items: _items(['date','progresiva']),
+                          initialValue: x,
+                          items: items(['date','progresiva']),
                           onChanged: (v) => setSB(() => x = v ?? x),
                           decoration: const InputDecoration(labelText: 'Eje X'),
                         ),
@@ -53,8 +53,8 @@ Future<void> showChartDialog(BuildContext context, List<Measurement> rows) async
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: y,
-                          items: _items(['ohm1m','ohm3m']),
+                          initialValue: y,
+                          items: items(['ohm1m','ohm3m']),
                           onChanged: (v) => setSB(() => y = v ?? y),
                           decoration: const InputDecoration(labelText: 'Eje Y'),
                         ),
@@ -62,8 +62,8 @@ Future<void> showChartDialog(BuildContext context, List<Measurement> rows) async
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: type,
-                          items: _items(['line','bar']),
+                          initialValue: type,
+                          items: items(['line','bar']),
                           onChanged: (v) => setSB(() => type = v ?? type),
                           decoration: const InputDecoration(labelText: 'Tipo'),
                         ),
@@ -75,20 +75,20 @@ Future<void> showChartDialog(BuildContext context, List<Measurement> rows) async
                     aspectRatio: 1.6,
                     child: (type == 'line')
                         ? LineChart(LineChartData(
-                      gridData: FlGridData(show: true),
-                      titlesData: FlTitlesData(show: false),
+                      gridData: const FlGridData(show: true),
+                      titlesData: const FlTitlesData(show: false),
                       borderData: FlBorderData(show: true),
                       lineBarsData: [
                         LineChartBarData(
-                          spots: _spots(),
+                          spots: spots(),
                           isCurved: false,
                           dotData: const FlDotData(show: false),
                         ),
                       ],
                     ))
                         : BarChart(BarChartData(
-                      titlesData: FlTitlesData(show: false),
-                      barGroups: _spots()
+                      titlesData: const FlTitlesData(show: false),
+                      barGroups: spots()
                           .map((s) => BarChartGroupData(x: s.x.toInt(), barRods: [
                         BarChartRodData(toY: s.y),
                       ]))

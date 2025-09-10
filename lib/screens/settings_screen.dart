@@ -1,4 +1,3 @@
-// lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
 
@@ -22,12 +21,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _settings = SettingsService.instance;
-    // Listener solo si el servicio implementa ChangeNotifier
-    if (_settings is ChangeNotifier) {
-      _maybeNotifier = _settings as ChangeNotifier;
-      _maybeNotifier!.addListener(_onServiceChanged);
-    }
-    _load();
+    _maybeNotifier = _settings as ChangeNotifier;
+    _maybeNotifier!.addListener(_onServiceChanged);
+      _load();
   }
 
   void _onServiceChanged() {
@@ -117,8 +113,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Text('Envío rápido', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
-
-            // ENDPOINT (opcional)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextFormField(
@@ -138,8 +132,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ),
-
-            // EMAIL POR DEFECTO (opcional)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextFormField(
@@ -160,7 +152,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ),
-
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
@@ -170,9 +161,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ),
-
             const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -193,7 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),

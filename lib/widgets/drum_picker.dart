@@ -1,7 +1,8 @@
 // lib/widgets/drum_picker.dart
 //
-// Picker estilo iOS con “glass verde”, buscador, segmentos masivos
-// y “Guardar como…”. Sin franja amarilla/negra. Listo para Flutter 3.32+.
+// Drum picker con animación suave, búsqueda, segmentos,
+// "Guardar como…", renombrar, elegir emoji y eliminar.
+// Listo para Flutter 3.32+.
 
 import 'dart:async';
 import 'dart:ui';
@@ -12,14 +13,20 @@ import 'package:flutter/services.dart';
 
 import '../models/sheet_meta.dart';
 
+// ====== Callbacks / helpers ======
+
 typedef SheetCreator = Future<SheetMeta?> Function();
 typedef SubtitleBuilder = String Function(SheetMeta);
 typedef SaveAsHandler = Future<SheetMeta?> Function(SheetMeta from, String newName);
+typedef RenameHandler = Future<SheetMeta?> Function(SheetMeta meta, String newName);
+typedef DeleteHandler = Future<bool> Function(SheetMeta meta);
 
 class DrumPickerStrings {
   final String cancel, open, searchPlaceholder, noSheets, createFirst, newSheet, creating;
-  final String tooltipClose, tooltipOpen, tooltipSearch, tooltipHideSearch, sheetLabelPrefix, errorCreate;
+  final String tooltipClose, tooltipOpen, tooltipSearch, tooltipHideSearch, errorCreate;
   final String saveAs, nameHint, segmentAll;
+  // Nuevos
+  final String rename, delete, emoji, deleteConfirmTitle, deleteConfirmMsg, ok;
 
   const DrumPickerStrings({
     required this.cancel,
@@ -33,11 +40,16 @@ class DrumPickerStrings {
     required this.tooltipOpen,
     required this.tooltipSearch,
     required this.tooltipHideSearch,
-    required this.sheetLabelPrefix,
     required this.errorCreate,
     required this.saveAs,
     required this.nameHint,
     required this.segmentAll,
+    required this.rename,
+    required this.delete,
+    required this.emoji,
+    required this.deleteConfirmTitle,
+    required this.deleteConfirmMsg,
+    required this.ok,
   });
 
   const DrumPickerStrings.es()
@@ -52,11 +64,16 @@ class DrumPickerStrings {
         tooltipOpen = 'Abrir planilla',
         tooltipSearch = 'Buscar',
         tooltipHideSearch = 'Ocultar búsqueda',
-        sheetLabelPrefix = 'Planilla',
         errorCreate = 'Error: No se pudo crear la planilla',
         saveAs = 'Guardar como…',
         nameHint = 'Nombre de la planilla',
-        segmentAll = 'Todas';
+        segmentAll = 'Todas',
+        rename = 'Renombrar',
+        delete = 'Eliminar',
+        emoji = 'Emoji',
+        deleteConfirmTitle = '¿Eliminar planilla?',
+        deleteConfirmMsg = 'Esta acción no se puede deshacer.',
+        ok = 'Aceptar';
 }
 
 /// Segmento para modo masivo (agrupa planillas).
@@ -66,6 +83,8 @@ class SheetSegment {
   final bool Function(SheetMeta) test;
   const SheetSegment(this.id, this.title, this.test);
 }
+
+// ====== API de apertura ======
 
 Future<SheetMeta?> showSheetDrumPickerThemed({
   required BuildContext context,
@@ -78,6 +97,9 @@ Future<SheetMeta?> showSheetDrumPickerThemed({
   List<SheetSegment>? segments,
   String? initialSegmentId,
   SaveAsHandler? onSaveAs,
+  RenameHandler? onRename,
+  DeleteHandler? onDelete,
+  List<String>? emojiChoices,
 }) {
   final cs = Theme.of(context).colorScheme;
   return showSheetDrumPicker(
@@ -95,6 +117,9 @@ Future<SheetMeta?> showSheetDrumPickerThemed({
     segments: segments,
     initialSegmentId: initialSegmentId,
     onSaveAs: onSaveAs,
+    onRename: onRename,
+    onDelete: onDelete,
+    emojiChoices: emojiChoices,
   );
 }
 
@@ -135,13 +160,16 @@ Future<SheetMeta?> showSheetDrumPicker({
   List<SheetSegment>? segments,
   String? initialSegmentId,
   SaveAsHandler? onSaveAs,
+  RenameHandler? onRename,
+  DeleteHandler? onDelete,
+  List<String>? emojiChoices,
 }) {
   return showModalBottomSheet<SheetMeta>(
     context: context,
     isScrollControlled: true,
     useRootNavigator: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withOpacity(.25),
+    barrierColor: Colors.black.withValues(alpha: .25),
     useSafeArea: true,
     routeSettings: const RouteSettings(name: 'sheet_drum_picker'),
     builder: (_) => _SheetDrumPickerSheet(
@@ -158,9 +186,15 @@ Future<SheetMeta?> showSheetDrumPicker({
       segments: segments,
       initialSegmentId: initialSegmentId,
       onSaveAs: onSaveAs,
+      onRename: onRename,
+      onDelete: onDelete,
+      emojiChoices: emojiChoices ??
+          const ['📋', '🧪', '📦', '📸', '📍', '✅', '⭐️', '🧾', '🔧', '🗂️'],
     ),
   );
 }
+
+// ====== Hoja ======
 
 class _SheetDrumPickerSheet extends StatefulWidget {
   const _SheetDrumPickerSheet({
@@ -177,6 +211,9 @@ class _SheetDrumPickerSheet extends StatefulWidget {
     this.segments,
     this.initialSegmentId,
     this.onSaveAs,
+    this.onRename,
+    this.onDelete,
+    this.emojiChoices = const [],
   });
 
   final List<SheetMeta> items;
@@ -189,6 +226,9 @@ class _SheetDrumPickerSheet extends StatefulWidget {
   final List<SheetSegment>? segments;
   final String? initialSegmentId;
   final SaveAsHandler? onSaveAs;
+  final RenameHandler? onRename;
+  final DeleteHandler? onDelete;
+  final List<String> emojiChoices;
 
   @override
   State<_SheetDrumPickerSheet> createState() => _SheetDrumPickerSheetState();
@@ -283,8 +323,171 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
   }
 
   void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), _applyFilters);
+  }
+
+  // -------- Quick edit --------
+
+  Future<void> _promptRename(SheetMeta m) async {
+    final s = widget.strings;
+    final ctrl = TextEditingController(text: m.name);
+    final newName = await showCupertinoDialog<String?>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text(s.rename),
+        content: Column(children: [
+          const SizedBox(height: 8),
+          CupertinoTextField(autofocus: true, controller: ctrl, placeholder: s.nameHint),
+        ]),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, null), child: Text(s.cancel)),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              final v = ctrl.text.trim();
+              Navigator.pop(context, v.isEmpty ? null : v);
+            },
+            child: Text(s.ok),
+          ),
+        ],
+      ),
+    );
+    if (newName == null) return;
+
+    if (widget.onRename != null) {
+      final updated = await widget.onRename!(m, newName);
+      if (updated != null) {
+        _replaceMeta(updated);
+        _applyFilters();
+      }
+    } else {
+      _replaceMeta(m.copyWith(name: newName));
+      _applyFilters();
+    }
+    _hSel();
+  }
+
+  Future<void> _promptEmoji(SheetMeta m) async {
+    if (widget.emojiChoices.isEmpty) return;
+    final chosen = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: Text(widget.strings.emoji),
+        actions: [
+          SizedBox(
+            height: 220,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6, mainAxisSpacing: 8, crossAxisSpacing: 8,
+              ),
+              itemCount: widget.emojiChoices.length,
+              itemBuilder: (_, i) => CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () => Navigator.pop(context, widget.emojiChoices[i]),
+                child: Text(widget.emojiChoices[i], style: const TextStyle(fontSize: 24)),
+              ),
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: Text(widget.strings.cancel),
+        ),
+      ),
+    );
+    if (chosen == null || chosen.isEmpty) return;
+
+    final newName = _applyEmojiToName(chosen, m.name);
+    if (widget.onRename != null) {
+      final updated = await widget.onRename!(m, newName);
+      if (updated != null) _replaceMeta(updated);
+    } else {
+      _replaceMeta(m.copyWith(name: newName));
+    }
+    _applyFilters();
+    _hSel();
+  }
+
+  String _applyEmojiToName(String emoji, String name) {
+    final trimmed = name.trimLeft();
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.isNotEmpty && _looksLikeEmoji(parts.first)) {
+      parts[0] = emoji;
+      return parts.join(' ');
+    }
+    return '$emoji $name';
+  }
+
+  bool _looksLikeEmoji(String s) => s.runes.length <= 3; // heurística simple
+
+  Future<void> _confirmDelete(SheetMeta m) async {
+    if (widget.onDelete == null) return;
+    final s = widget.strings;
+    final ok = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text(s.deleteConfirmTitle),
+        content: Text(s.deleteConfirmMsg),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: Text(s.cancel)),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.delete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final removed = await widget.onDelete!(m);
+    if (removed) {
+      final list = List<SheetMeta>.from(_all.value)..removeWhere((e) => e.id == m.id);
+      _all.value = list;
+      _applyFilters();
+      _hSel();
+    }
+  }
+
+  void _replaceMeta(SheetMeta updated) {
+    final list = List<SheetMeta>.from(_all.value);
+    final i = list.indexWhere((e) => e.id == updated.id);
+    if (i != -1) list[i] = updated;
+    _all.value = list;
+  }
+
+  Future<void> _showItemActions(SheetMeta m) async {
+    final s = widget.strings;
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (_) => CupertinoActionSheet(
+        title: Text(m.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          CupertinoActionSheetAction(onPressed: () { Navigator.pop(context); _promptRename(m); }, child: Text(s.rename)),
+          if (widget.onSaveAs != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _promptSaveAs(m, s);
+              },
+              child: Text(s.saveAs),
+            ),
+          if (widget.emojiChoices.isNotEmpty)
+            CupertinoActionSheetAction(onPressed: () { Navigator.pop(context); _promptEmoji(m); }, child: Text(s.emoji)),
+          if (widget.onDelete != null)
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () { Navigator.pop(context); _confirmDelete(m); },
+              child: Text(s.delete),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          child: Text(s.cancel),
+        ),
+      ),
+    );
   }
 
   Future<void> _promptSaveAs(SheetMeta base, DrumPickerStrings s) async {
@@ -297,25 +500,18 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
         content: Column(
           children: [
             const SizedBox(height: 8),
-            CupertinoTextField(
-              controller: ctrl,
-              placeholder: s.nameHint,
-              autofocus: true,
-            ),
+            CupertinoTextField(controller: ctrl, placeholder: s.nameHint, autofocus: true),
           ],
         ),
         actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, null),
-            child: Text(s.cancel),
-          ),
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, null), child: Text(s.cancel)),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () {
               final v = ctrl.text.trim();
               Navigator.pop(context, v.isEmpty ? null : v);
             },
-            child: const Text('Guardar'),
+            child: Text(s.ok),
           ),
         ],
       ),
@@ -330,6 +526,8 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
     _selected.value = 0;
     _hSel();
   }
+
+  // -------- UI --------
 
   Widget _pillTile(SheetMeta m, bool isSelected, double itemExtent) {
     final sub = widget.subtitleBuilder?.call(m) ?? '';
@@ -348,6 +546,22 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
           accent: widget.accent,
           textColor: widget.textColor,
           maxHeight: itemExtent,
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              splashRadius: 18,
+              onPressed: () => _promptRename(m),
+              icon: const Icon(CupertinoIcons.pencil),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              splashRadius: 18,
+              onPressed: () => _showItemActions(m),
+              icon: const Icon(CupertinoIcons.ellipsis),
+            ),
+          ]),
         ),
       ),
     );
@@ -357,7 +571,6 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
   Widget build(BuildContext context) {
     final s = widget.strings;
     final surface = widget.surface, divider = widget.divider, accent = widget.accent, textColor = widget.textColor;
-    final itemExtent = _itemExtentFor(context);
     final noAnim = MediaQuery.of(context).disableAnimations;
     final d140 = noAnim ? Duration.zero : const Duration(milliseconds: 140);
     final d160 = noAnim ? Duration.zero : const Duration(milliseconds: 160);
@@ -371,24 +584,23 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
             child: ClipRect(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(color: Colors.black.withOpacity(.18)),
+                child: Container(color: Colors.black.withValues(alpha: .18)),
               ),
             ),
           ),
           Container(
             decoration: BoxDecoration(
-              color: surface.withOpacity(.86),
+              color: surface.withValues(alpha: .86),
               border: Border(top: BorderSide(color: divider)),
             ),
             child: SafeArea(
               top: false,
               child: Shortcuts(
-                // API moderna (evita errores de “const map literal”).
-                shortcuts: <ShortcutActivator, Intent>{
-                  const SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-                  const SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
-                  const SingleActivator(LogicalKeyboardKey.arrowUp): _MoveIntent(-1),
-                  const SingleActivator(LogicalKeyboardKey.arrowDown): _MoveIntent(1),
+                shortcuts: const <ShortcutActivator, Intent>{
+                  SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+                  SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
+                  SingleActivator(LogicalKeyboardKey.arrowUp): _MoveIntent(-1),
+                  SingleActivator(LogicalKeyboardKey.arrowDown): _MoveIntent(1),
                 },
                 child: Actions(
                   actions: <Type, Action<Intent>>{
@@ -437,7 +649,6 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                   child: Text(s.cancel),
                                 ),
                               ),
-                              // FIX overflow: centrado escalable con elipsis
                               Expanded(
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -451,16 +662,13 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                         widget.title,
                                         overflow: TextOverflow.ellipsis,
                                         softWrap: false,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: textColor,
-                                        ),
+                                        style: TextStyle(fontWeight: FontWeight.w700, color: textColor),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              // Guardar como…
+                              // "Guardar como…"
                               ValueListenableBuilder<int>(
                                 valueListenable: _selected,
                                 builder: (_, sel, __) => IconButton(
@@ -472,10 +680,10 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                     if (list.isEmpty) return;
                                     _promptSaveAs(list[sel.clamp(0, list.length - 1)], s);
                                   },
-                                  icon: const Icon(CupertinoIcons.ellipsis),
+                                  icon: const Icon(CupertinoIcons.tray_full),
                                 ),
                               ),
-                              // Toggle buscador
+                              // Toggle búsqueda
                               ValueListenableBuilder<bool>(
                                 valueListenable: _searching,
                                 builder: (_, on, __) => IconButton(
@@ -490,6 +698,7 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                   icon: Icon(on ? CupertinoIcons.xmark : CupertinoIcons.search),
                                 ),
                               ),
+                              // Abrir
                               ValueListenableBuilder<int>(
                                 valueListenable: _selected,
                                 builder: (_, sel, __) => Tooltip(
@@ -524,7 +733,7 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                           ),
                         ),
 
-                        // Segmentos (masivo)
+                        // Segmentos
                         if (_segments.length > 1)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
@@ -570,7 +779,9 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                       }
                                       _hSel();
                                     } catch (_) {
-                                      messenger?.showSnackBar(SnackBar(content: Text(widget.strings.errorCreate)));
+                                      messenger?.showSnackBar(
+                                        SnackBar(content: Text(widget.strings.errorCreate)),
+                                      );
                                     } finally {
                                       if (mounted) _busy.value = false;
                                     }
@@ -586,10 +797,11 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
 
                         const SizedBox(height: 6),
 
-                        // Tambor con altura acotada (no overflow)
+                        // Tambor
                         Flexible(
                           child: LayoutBuilder(
                             builder: (context, c) {
+                              final itemExtent = _itemExtentFor(context);
                               final desired = itemExtent * 3.6;
                               final minOk = itemExtent * 2.2;
                               final wheelH = desired.clamp(minOk, c.maxHeight);
@@ -610,8 +822,8 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                                     begin: Alignment.topCenter,
                                                     end: Alignment.bottomCenter,
                                                     colors: [
-                                                      surface.withOpacity(.86),
-                                                      surface.withOpacity(0),
+                                                      surface.withValues(alpha: .86),
+                                                      surface.withValues(alpha: 0),
                                                     ],
                                                   ),
                                                 ),
@@ -624,8 +836,8 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                                     begin: Alignment.bottomCenter,
                                                     end: Alignment.topCenter,
                                                     colors: [
-                                                      surface.withOpacity(.86),
-                                                      surface.withOpacity(0),
+                                                      surface.withValues(alpha: .86),
+                                                      surface.withValues(alpha: 0),
                                                     ],
                                                   ),
                                                 ),
@@ -648,7 +860,10 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                             squeeze: 1.05,
                                             useMagnifier: true,
                                             magnification: 1.045,
-                                            selectionOverlay: _IOSSelectionOverlay(height: itemExtent, accent: accent),
+                                            selectionOverlay: _IOSSelectionOverlay(
+                                              height: itemExtent,
+                                              accent: accent,
+                                            ),
                                             onSelectedItemChanged: (i) {
                                               if (i != _selected.value) {
                                                 _selected.value = i;
@@ -668,7 +883,11 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                                                       if (isSel) {
                                                         _confirmIndex(context, i);
                                                       } else {
-                                                        _controller.animateToItem(i, duration: d140, curve: Curves.easeOutCubic);
+                                                        _controller.animateToItem(
+                                                          i,
+                                                          duration: d140,
+                                                          curve: Curves.easeOutCubic,
+                                                        );
                                                       }
                                                     },
                                                     onDoubleTap: () => _confirmIndex(context, i),
@@ -687,7 +906,6 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
                             },
                           ),
                         ),
-
                         const SizedBox(height: 8),
                       ],
                     ),
@@ -701,6 +919,8 @@ class _SheetDrumPickerSheetState extends State<_SheetDrumPickerSheet> {
     );
   }
 }
+
+// ====== Widgets de apoyo ======
 
 class _MoveIntent extends Intent {
   const _MoveIntent(this.delta);
@@ -718,9 +938,9 @@ class _SheetGrabHandle extends StatelessWidget {
           width: 38,
           height: 5,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.18),
+            color: Colors.white.withValues(alpha: .18),
             borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: Colors.white.withOpacity(.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: .10)),
           ),
         ),
       ),
@@ -741,7 +961,7 @@ class _IOSSelectionOverlay extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withOpacity(.90), width: 1.5),
+            border: Border.all(color: accent.withValues(alpha: .90), width: 1.5),
           ),
         ),
       ),
@@ -758,15 +978,9 @@ Widget _emptyState(Color textColor, DrumPickerStrings s, bool showCreateHint) {
         children: [
           const _SheetIcon(size: 28),
           const SizedBox(height: 10),
-          Text(
-            s.noSheets,
-            style: TextStyle(color: textColor.withOpacity(.8), fontWeight: FontWeight.w600),
-          ),
+          Text(s.noSheets, style: TextStyle(color: textColor.withValues(alpha: .8), fontWeight: FontWeight.w600)),
           if (showCreateHint)
-            Text(
-              s.createFirst,
-              style: TextStyle(color: textColor.withOpacity(.6), fontSize: 12.5),
-            ),
+            Text(s.createFirst, style: TextStyle(color: textColor.withValues(alpha: .6), fontSize: 12.5)),
         ],
       ),
     ),
@@ -790,12 +1004,14 @@ class _GlassPill extends StatelessWidget {
     required this.accent,
     required this.textColor,
     required this.maxHeight,
+    this.trailing,
   });
 
   final String title, subtitle;
   final bool selected;
   final Color accent, textColor;
   final double maxHeight;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -815,17 +1031,17 @@ class _GlassPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: vPad),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? accent : accent.withOpacity(.35), width: selected ? 2 : 1),
+          border: Border.all(color: selected ? accent : accent.withValues(alpha: .35), width: selected ? 2 : 1),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              (isDark ? const Color(0xFF0E1D0E) : const Color(0xFFEBF6EB)).withOpacity(isDark ? .45 : .55),
-              (isDark ? const Color(0xFF1D3A1D) : const Color(0xFFDFF0DF)).withOpacity(isDark ? .35 : .45),
+              (isDark ? const Color(0xFF0E1D0E) : const Color(0xFFEBF6EB)).withValues(alpha: isDark ? .45 : .55),
+              (isDark ? const Color(0xFF1D3A1D) : const Color(0xFFDFF0DF)).withValues(alpha: isDark ? .35 : .45),
             ],
           ),
           boxShadow: selected
-              ? [BoxShadow(color: accent.withOpacity(.25), blurRadius: 18, spreadRadius: 1, offset: const Offset(0, 6))]
+              ? [BoxShadow(color: accent.withValues(alpha: .25), blurRadius: 18, spreadRadius: 1, offset: const Offset(0, 6))]
               : null,
         ),
         child: Stack(
@@ -836,7 +1052,7 @@ class _GlassPill extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                    child: Container(color: Colors.white.withOpacity(.04)),
+                    child: Container(color: Colors.white.withValues(alpha: .04)),
                   ),
                 ),
               ),
@@ -877,7 +1093,7 @@ class _GlassPill extends StatelessWidget {
                             applyHeightToLastDescent: false,
                           ),
                           style: TextStyle(
-                            color: textColor.withOpacity(.72),
+                            color: textColor.withValues(alpha: .72),
                             fontSize: subtitleSize,
                             height: 1.00,
                           ),
@@ -885,6 +1101,7 @@ class _GlassPill extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (trailing != null) trailing!,
               ],
             ),
           ],
@@ -927,8 +1144,16 @@ class _SweepShineState extends State<_SweepShine> with SingleTickerProviderState
             return LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Colors.transparent, Colors.white.withOpacity(.22), Colors.transparent],
-              stops: [(x / r.width).clamp(0, 1), (_c.value).clamp(0, 1), ((_c.value) + .15).clamp(0, 1)],
+              colors: [
+                Colors.transparent,
+                Colors.white.withValues(alpha: .22),
+                Colors.transparent,
+              ],
+              stops: [
+                (x / r.width).clamp(0, 1),
+                (_c.value).clamp(0, 1),
+                ((_c.value) + .15).clamp(0, 1),
+              ],
             ).createShader(r);
           },
           blendMode: BlendMode.plus,

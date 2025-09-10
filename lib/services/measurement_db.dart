@@ -34,7 +34,7 @@ class MeasurementDB {
     // 2) actualizar el registro con el id persistido
     map['id'] = key;
     await box.put(key, map);
-    return key as int;
+    return key;
   }
 
   Future<List<Measurement>> getAll() async {
@@ -43,7 +43,7 @@ class MeasurementDB {
     final list = <Measurement>[];
     for (final v in values) {
       if (v is Map) {
-        final map = Map<String, dynamic>.from(v as Map);
+        final map = Map<String, dynamic>.from(v);
         // Hive guarda DateTime nativamente; Measurement.fromJson acepta DateTime.
         list.add(Measurement.fromJson(map));
       }

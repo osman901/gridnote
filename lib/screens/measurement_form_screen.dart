@@ -43,8 +43,8 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     final m = widget.initial ?? Measurement.empty();
 
     _progCtrl = TextEditingController(text: m.progresiva);
-    _ohm1Ctrl = TextEditingController(text: m.ohm1m?.toString() ?? '');
-    _ohm3Ctrl = TextEditingController(text: m.ohm3m?.toString() ?? '');
+    _ohm1Ctrl = TextEditingController(text: m.ohm1m.toString() ?? '');
+    _ohm3Ctrl = TextEditingController(text: m.ohm3m.toString() ?? '');
     _obsCtrl = TextEditingController(text: m.observations);
     _latCtrl = TextEditingController(text: m.latitude?.toString() ?? '');
     _lonCtrl = TextEditingController(text: m.longitude?.toString() ?? '');

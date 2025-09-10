@@ -10,9 +10,9 @@ class OnboardingScreen extends StatelessWidget {
       color: cs.surface,
       alignment: Alignment.center,
       padding: const EdgeInsets.all(24),
-      child: Column(
+      child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
+        children: [
           _Tile(
             icon: Icons.cloud_off_outlined,
             title: 'Trabajo offline',

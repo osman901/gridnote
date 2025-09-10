@@ -112,9 +112,13 @@ class _AiUtil {
 
   static Iterable<double> columnOhms(AiCellContext ctx) sync* {
     if (ctx.columnName == MeasurementColumn.ohm1m) {
-      for (final r in ctx.rows) yield r.ohm1m;
+      for (final r in ctx.rows) {
+        yield r.ohm1m;
+      }
     } else if (ctx.columnName == MeasurementColumn.ohm3m) {
-      for (final r in ctx.rows) yield r.ohm3m;
+      for (final r in ctx.rows) {
+        yield r.ohm3m;
+      }
     }
   }
 
@@ -212,7 +216,9 @@ class OhmsArithmeticHandler extends RuleHandler {
   @override
   Future<AiResult?> process(AiCellContext ctx, String raw) async {
     if (ctx.columnName != MeasurementColumn.ohm1m &&
-        ctx.columnName != MeasurementColumn.ohm3m) return null;
+        ctx.columnName != MeasurementColumn.ohm3m) {
+      return null;
+    }
 
     final s = raw.toLowerCase().replaceAll(',', '.').trim();
     final m = _AiUtil.opRegex.firstMatch(s);
@@ -259,7 +265,9 @@ class OhmsStatsHandler extends RuleHandler {
   @override
   Future<AiResult?> process(AiCellContext ctx, String raw) async {
     if (ctx.columnName != MeasurementColumn.ohm1m &&
-        ctx.columnName != MeasurementColumn.ohm3m) return null;
+        ctx.columnName != MeasurementColumn.ohm3m) {
+      return null;
+    }
 
     final s = raw.trim().toLowerCase();
     String? fn;
@@ -325,7 +333,9 @@ class OhmsDirectNumberHandler extends RuleHandler {
   @override
   Future<AiResult?> process(AiCellContext ctx, String raw) async {
     if (ctx.columnName != MeasurementColumn.ohm1m &&
-        ctx.columnName != MeasurementColumn.ohm3m) return null;
+        ctx.columnName != MeasurementColumn.ohm3m) {
+      return null;
+    }
 
     final s = raw.toLowerCase().replaceAll(' ', '');
     if (!_AiUtil.numWithUnitRegex.hasMatch(s)) return null;

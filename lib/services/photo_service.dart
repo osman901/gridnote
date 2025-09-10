@@ -1,79 +1,140 @@
 // lib/services/photo_service.dart
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/photo_attachment.dart';
-import 'photo_store.dart';
 
 class PhotoService {
   PhotoService._();
-  static final PhotoService instance = PhotoService._();
+  static final instance = PhotoService._();
+
   final ImagePicker _picker = ImagePicker();
 
+  // Límite para evitar OOM en equipos de baja memoria.
+  static const int maxPhotosPerSheet = 20;
+
   Future<Directory> _sheetDir(String sheetId) async {
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory(p.join(base.path, 'photos', sheetId));
-    if (!await dir.exists()) await dir.create(recursive: true);
+    final List<Directory>? pics =
+    await getExternalStorageDirectories(type: StorageDirectory.pictures);
+    final Directory base =
+    (pics != null && pics.isNotEmpty) ? pics.first : await getApplicationDocumentsDirectory();
+
+    final dir = Directory(p.join(base.path, 'Gridnote', sheetId));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
     return dir;
   }
 
-  /// Lista TODAS las fotos de la planilla (todas las filas y bucket _sheet).
+  /// Lista todas las fotos de la planilla, más recientes primero.
   Future<List<PhotoAttachment>> list(String sheetId) async {
-    final root = await _sheetDir(sheetId);
-    if (!await root.exists()) return const <PhotoAttachment>[];
+    final dir = await _sheetDir(sheetId);
+    if (!await dir.exists()) return [];
 
-    final files = <File>[];
-    await for (final ent in root.list(recursive: true, followLinks: false)) {
-      if (ent is File && ent.path.toLowerCase().endsWith('.jpg')) {
-        files.add(ent);
-      }
+    final List<PhotoAttachment> out = [];
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final ext = p.extension(entity.path).toLowerCase();
+      if (ext != '.jpg' && ext != '.jpeg' && ext != '.png' && ext != '.webp') continue;
+
+      final created = File(entity.path).lastModifiedSync();
+
+      // Tu modelo NO tiene rowId, así que no lo pasamos.
+      out.add(PhotoAttachment(
+        path: entity.path,
+        createdAt: created, // requerido por tu modelo
+      ));
     }
-    files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
 
-    return files.map((f) {
-      final created = f.statSync().modified;
-      // NO pasamos rowId porque el modelo no lo define.
-      // (La UI lo deriva del path si lo necesita.)
-      return PhotoAttachment(path: f.path, createdAt: created);
-    }).toList();
+    out.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return out;
   }
 
-  /// Saca foto con cámara y la guarda en bucket general "_sheet".
-  Future<File?> addFromCamera(String sheetId) =>
-      PhotoStore.addFromCamera(sheetId, '_sheet');
-
-  /// Elige de galería y copia a bucket general "_sheet".
-  Future<File?> addFromGallery(String sheetId) async {
-    XFile? x;
-    try {
-      x = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 4096,
-        imageQuality: 95,
-      );
-    } catch (_) {}
-    if (x == null) return null;
-
-    final dir = Directory(p.join((await _sheetDir(sheetId)).path, '_sheet'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-
-    final ts = DateTime.now().toUtc().millisecondsSinceEpoch;
-    final target = File(p.join(dir.path, 'IMG_$ts.jpg'));
-
-    try {
-      await x.saveTo(target.path);
-    } catch (_) {
-      await File(x.path).copy(target.path);
-    }
-    return await target.exists() ? target : null;
+  Future<File?> addFromCamera(String sheetId, {String? rowId}) async {
+    final XFile? picked = await _picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      requestFullMetadata: false,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return null;
+    return _saveResized(picked, sheetId, rowId: rowId);
   }
 
+  Future<File?> addFromGallery(String sheetId, {String? rowId}) async {
+    final XFile? picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      requestFullMetadata: false,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return null;
+    return _saveResized(picked, sheetId, rowId: rowId);
+  }
+
+  /// Elimina el archivo en disco.
   Future<void> delete(PhotoAttachment a) async {
     final f = File(a.path);
     if (await f.exists()) {
       await f.delete();
     }
   }
+
+  Future<File> _saveResized(XFile picked, String sheetId, {String? rowId}) async {
+    // Límite por planilla para evitar caídas por memoria.
+    final existing = await list(sheetId);
+    if (existing.length >= maxPhotosPerSheet) {
+      throw Exception('Demasiadas fotos: límite de $maxPhotosPerSheet por planilla');
+    }
+
+    final bytes = await picked.readAsBytes(); // Uint8List (viene de foundation)
+    final outBytes = await compute(_downscaleJpeg, <String, Object?>{
+      'bytes': bytes,
+      'target': 1600,
+      'quality': 85,
+    });
+
+    final baseDir = await _sheetDir(sheetId);
+    final bucket = rowId ?? '_sheet';
+    final targetDir = Directory(p.join(baseDir.path, bucket));
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+
+    final name = 'ph_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final file = File(p.join(targetDir.path, name));
+    await file.writeAsBytes(outBytes, flush: true);
+    return file;
+  }
+}
+
+/// Función toplevel para compute(): recibe Map y devuelve Uint8List.
+Uint8List _downscaleJpeg(Map<String, Object?> m) {
+  final bytes = m['bytes'] as Uint8List;
+  final target = m['target'] as int;
+  final quality = m['quality'] as int;
+
+  final src = img.decodeImage(bytes);
+  if (src == null) return bytes;
+
+  final w = src.width, h = src.height;
+  final longEdge = w > h ? w : h;
+  if (longEdge > target) {
+    final scale = target / longEdge;
+    final dst = img.copyResize(
+      src,
+      width: (w * scale).round(),
+      height: (h * scale).round(),
+      interpolation: img.Interpolation.average,
+    );
+    return Uint8List.fromList(img.encodeJpg(dst, quality: quality));
+  }
+  return Uint8List.fromList(img.encodeJpg(src, quality: quality));
 }

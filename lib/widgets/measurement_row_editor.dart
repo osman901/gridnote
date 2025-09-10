@@ -65,8 +65,8 @@ class _MeasurementRowEditorState extends State<MeasurementRowEditor> {
     super.initState();
     m = widget.initial;
     _progCtrl.text = m.progresiva;
-    _ohm1Ctrl.text = m.ohm1m?.toString() ?? '';
-    _ohm3Ctrl.text = m.ohm3m?.toString() ?? '';
+    _ohm1Ctrl.text = m.ohm1m.toString() ?? '';
+    _ohm3Ctrl.text = m.ohm3m.toString() ?? '';
     _obsCtrl.text = m.observations;
     _latCtrl.text = m.latitude?.toStringAsFixed(6) ?? '';
     _lonCtrl.text = m.longitude?.toStringAsFixed(6) ?? '';

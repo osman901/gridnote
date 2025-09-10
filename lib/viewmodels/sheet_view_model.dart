@@ -1,4 +1,3 @@
-// lib/viewmodels/sheet_view_model.dart
 import 'dart:async';
 import 'dart:io';
 
@@ -26,7 +25,7 @@ enum PermResult { ok, disabled, denied, deniedForever }
 class SheetViewModel {
   SheetViewModel({
     required this.sheetId,
-    required String initialTitle,          // <- parámetro simple, no "this."
+    required String initialTitle,
     required List<Measurement> initialRows,
     required this.audit,
     required this.onSnack,
@@ -105,7 +104,8 @@ class SheetViewModel {
   // --- Headers ---
   Future<void> _loadHeaders() async {
     final raw = _sp.getString(_headersKey);
-    final map = (raw == null || raw.isEmpty) ? <String, String>{} : Map<String, String>.from(Uri.splitQueryString(raw));
+    final map =
+    (raw == null || raw.isEmpty) ? <String, String>{} : Map<String, String>.from(Uri.splitQueryString(raw));
     headers.value = map;
   }
 
@@ -168,6 +168,38 @@ class SheetViewModel {
     return PermResult.ok;
   }
 
+  bool _isInvalidPosition(Position? p) {
+    if (p == null) return true;
+    final isZero = p.latitude.abs() < 1e-6 && p.longitude.abs() < 1e-6;
+    final badAccuracy = p.accuracy.isFinite ? (p.accuracy > 1000) : false; // >1km = dudoso
+    return isZero || badAccuracy;
+  }
+
+  Future<Position?> _tryGetCurrent({
+    Duration timeout = const Duration(seconds: 8),
+    LocationAccuracy acc = LocationAccuracy.high,
+  }) async {
+    try {
+      return await Geolocator.getCurrentPosition(desiredAccuracy: acc, timeLimit: timeout);
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Position?> _getLastKnownRecent({Duration maxAge = const Duration(minutes: 5)}) async {
+    try {
+      final p = await Geolocator.getLastKnownPosition();
+      if (p == null) return null;
+      final ts = p.timestamp ?? DateTime.now();
+      if (DateTime.now().difference(ts) > maxAge) return null;
+      return p;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> saveLocation() async {
     if (isBusy.value) return;
     isBusy.value = true;
@@ -186,8 +218,22 @@ class SheetViewModel {
         case PermResult.ok:
           break;
       }
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      await _sp.setDouble(_latKey, pos.latitude);
+
+      // Estrategia robusta: actual → lastKnown reciente → intento adicional a media precisión.
+      Position? pos = await _tryGetCurrent();
+      if (_isInvalidPosition(pos)) {
+        final last = await _getLastKnownRecent();
+        if (!_isInvalidPosition(last)) pos = last;
+      }
+      if (_isInvalidPosition(pos)) {
+        pos = await _tryGetCurrent(timeout: const Duration(seconds: 12), acc: LocationAccuracy.medium);
+      }
+      if (_isInvalidPosition(pos)) {
+        onSnack('No se pudo obtener una ubicación válida.');
+        return;
+      }
+
+      await _sp.setDouble(_latKey, pos!.latitude);
       await _sp.setDouble(_lngKey, pos.longitude);
       lat.value = pos.latitude;
       lng.value = pos.longitude;
@@ -205,7 +251,14 @@ class SheetViewModel {
   Future<void> openMapsFor({double? latParam, double? lngParam}) async {
     final la = latParam ?? lat.value;
     final lo = lngParam ?? lng.value;
-    if (la == null || lo == null) return;
+    if (la == null || lo == null) {
+      onSnack('Ubicación no disponible.');
+      return;
+    }
+    if (la.abs() < 1e-6 && lo.abs() < 1e-6) {
+      onSnack('Ubicación inválida (0,0). Intentá volver a guardarla.');
+      return;
+    }
 
     final bool isIOS = defaultTargetPlatform == TargetPlatform.iOS;
     final Uri uriApp = isIOS ? Uri.parse('maps://?q=$la,$lo') : Uri.parse('geo:$la,$lo?q=$la,$lo');
@@ -251,7 +304,6 @@ class SheetViewModel {
     final base = _safeFileName(title.value);
     final ts = DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').replaceAll('-', '');
     final name = 'gridnote_${base}_$ts.csv';
-    // <- método estático
     return CsvExportService.exportMeasurements(rows, fileName: name);
   }
 
@@ -259,7 +311,6 @@ class SheetViewModel {
     final base = _safeFileName(title.value);
     final ts = DateTime.now().toIso8601String().replaceAll(':', '').replaceAll('.', '').replaceAll('-', '');
     final name = 'gridnote_${base}_$ts.pdf';
-    // <- método estático
     return PdfExportService.export(title: title.value, rows: rows, fileName: name);
   }
 
@@ -455,7 +506,9 @@ class SheetViewModel {
       for (final e in entities) {
         if (e is! File) continue;
         final p = e.path;
-        if ((!p.endsWith('.xlsx') && !p.endsWith('.csv') && !p.endsWith('.pdf')) || !p.contains('gridnote_')) continue;
+        if ((!p.endsWith('.xlsx') && !p.endsWith('.csv') && !p.endsWith('.pdf')) || !p.contains('gridnote_')) {
+          continue;
+        }
         final stat = await e.stat();
         if (now.difference(stat.modified) > maxAge) {
           try {

@@ -1,84 +1,133 @@
-// lib/data/app_db.dart
+// Drift DB: hojas + filas (JSON), simple y sólido.
+import 'dart:convert';
+import 'dart:io';
 import 'package:drift/drift.dart';
-import 'package:drift_sqflite/drift_sqflite.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 part 'app_db.g.dart';
 
-@DataClassName('SheetRow')
 class Sheets extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text()();
-  IntColumn get version => integer().withDefault(const Constant(1))();
+  TextColumn get id => text()();                         // p.ej. 'default'
+  TextColumn get name => text().withDefault(Constant('Bitácora'))();
+  IntColumn  get columns => integer().withDefault(const Constant(5))();
+  TextColumn get headersJson => text().withDefault(const Constant('[]'))(); // List<String>
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
-@DataClassName('EntryRow')
-class Entries extends Table {
+class Rows extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get sheetId => integer().references(Sheets, #id)();
-  TextColumn get title => text().nullable()();
-  TextColumn get note => text().nullable()();
+  TextColumn get sheetId => text().references(Sheets, #id)();
+  IntColumn  get index => integer()();                    // posición visual
+  TextColumn get cellsJson => text()();                   // List<String>
+  TextColumn get photosJson => text().withDefault(const Constant('[]'))(); // List<String>
   RealColumn get lat => real().nullable()();
   RealColumn get lng => real().nullable()();
-  RealColumn get accuracy => real().nullable()();
-  TextColumn get provider => text().nullable()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get placeName => text().nullable()();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
-}
-
-@DataClassName('AttachmentRow')
-class Attachments extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get entryId => integer().references(Entries, #id)();
-  TextColumn get path => text()();
-  TextColumn get thumbPath => text()();
-  IntColumn get sizeBytes => integer()();
-  TextColumn get hash => text()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-
   @override
-  List<Set<Column>> get uniqueKeys => [
-    {hash},
-  ];
+  List<String> get customConstraints => ['UNIQUE(sheet_id, "index") ON CONFLICT REPLACE'];
 }
 
-@DriftDatabase(tables: [Sheets, Entries, Attachments])
+@DriftDatabase(tables: [Sheets, Rows])
 class AppDb extends _$AppDb {
-  AppDb()
-      : super(SqfliteQueryExecutor.inDatabaseFolder(
-    path: 'bitacora.db',
-    logStatements: kDebugMode,
-  ));
+  AppDb() : super(_openConn());
+  @override int get schemaVersion => 1;
 
-  @override
-  int get schemaVersion => 3;
+  // Sheets
+  Future<void> upsertSheet({
+    required String id,
+    String? name,
+    int? columns,
+    List<String>? headers,
+  }) async {
+    final now = DateTime.now();
+    final s = SheetsCompanion(
+      id: Value(id),
+      name: name != null ? Value(name) : const Value.absent(),
+      columns: columns != null ? Value(columns) : const Value.absent(),
+      headersJson: headers != null ? Value(jsonEncode(headers)) : const Value.absent(),
+      updatedAt: Value(now),
+    );
+    await into(sheets).insertOnConflictUpdate(s);
+  }
 
-  @override
-  MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) async {
-      await m.createAll();
-      await customStatement('CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON sheets (created_at)');
-      await customStatement('CREATE INDEX IF NOT EXISTS idx_entries_sheet_created ON entries (sheet_id, created_at)');
-      await customStatement('CREATE INDEX IF NOT EXISTS idx_attachments_entry ON attachments (entry_id)');
-    },
-    onUpgrade: (m, from, to) async {
-      if (from < 2) {
-        await customStatement('CREATE INDEX IF NOT EXISTS idx_sheets_created_at ON sheets (created_at)');
-      }
-      if (from < 3) {
-        await m.createTable(entries);
-        await m.createTable(attachments);
-        await customStatement('CREATE INDEX IF NOT EXISTS idx_entries_sheet_created ON entries (sheet_id, created_at)');
-        await customStatement('CREATE INDEX IF NOT EXISTS idx_attachments_entry ON attachments (entry_id)');
-      }
-    },
-    beforeOpen: (details) async {
-      await customStatement('PRAGMA foreign_keys = ON');
-      await customStatement('PRAGMA journal_mode = WAL');
-      await customStatement('PRAGMA synchronous = NORMAL');
-      await customStatement('PRAGMA temp_store = MEMORY');
-    },
-  );
+  Future<SheetData?> fetchSheet(String id) async {
+    final s = await (select(sheets)..where((t) => t.id.equals(id))).getSingleOrNull();
+    if (s == null) return null;
+    final rs = await (select(rows)..where((r) => r.sheetId.equals(id))..orderBy([(r) => OrderingTerm.asc(r.index)])).get();
+    return SheetData(
+      id: s.id,
+      name: s.name,
+      columns: s.columns,
+      headers: (jsonDecode(s.headersJson) as List).cast<String>(),
+      rows: rs.map((e) => RowData(
+        id: e.id,
+        index: e.index,
+        cells: (jsonDecode(e.cellsJson) as List).cast<String>(),
+        photos: (jsonDecode(e.photosJson) as List).cast<String>(),
+        lat: e.lat, lng: e.lng, placeName: e.placeName,
+      )).toList(),
+    );
+  }
+
+  // Rows
+  Future<int> addRow(String sheetId, int index, List<String> cells) =>
+      into(rows).insert(RowsCompanion(
+        sheetId: Value(sheetId),
+        index: Value(index),
+        cellsJson: Value(jsonEncode(cells)),
+      ));
+
+  Future<void> updateRow(RowData r) async {
+    await (update(rows)..where((t) => t.id.equals(r.id))).write(RowsCompanion(
+      index: Value(r.index),
+      cellsJson: Value(jsonEncode(r.cells)),
+      photosJson: Value(jsonEncode(r.photos)),
+      lat: Value(r.lat),
+      lng: Value(r.lng),
+      placeName: Value(r.placeName),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  Future<void> deleteRow(int id) async =>
+      (delete(rows)..where((t) => t.id.equals(id))).go();
+}
+
+// ---------- Tipos de dominio planos ----------
+class SheetData {
+  final String id, name;
+  final int columns;
+  final List<String> headers;
+  final List<RowData> rows;
+  SheetData({required this.id, required this.name, required this.columns, required this.headers, required this.rows});
+}
+
+class RowData {
+  final int id;
+  int index;
+  List<String> cells;
+  List<String> photos;
+  double? lat, lng;
+  String? placeName;
+  RowData({
+    required this.id,
+    required this.index,
+    required this.cells,
+    required this.photos,
+    this.lat, this.lng, this.placeName,
+  });
+}
+
+QueryExecutor _openConn() {
+  return LazyDatabase(() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'bitacora.db'));
+    return NativeDatabase.createInBackground(file);
+  });
 }

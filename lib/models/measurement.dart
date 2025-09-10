@@ -15,6 +15,7 @@ class Measurement {
   @HiveField(4) final String observations;
   @HiveField(5) final double? latitude;
   @HiveField(6) final double? longitude;
+  /// Siempre guardada como **medianoche UTC (fecha-solo)**
   @HiveField(7) final DateTime date;
 
   const Measurement({
@@ -28,15 +29,19 @@ class Measurement {
     required this.date,
   });
 
+  /// Normaliza un DateTime local a **medianoche UTC** (fecha-solo).
+  static DateTime utcFromLocalDate(DateTime local) =>
+      DateTime.utc(local.year, local.month, local.day);
+
   factory Measurement.empty() => Measurement(
     progresiva: '',
     ohm1m: 0,
     ohm3m: 0,
     observations: '',
-    date: DateTime.now().toUtc(),
+    date: utcFromLocalDate(DateTime.now()),
   );
 
-  /// Devuelve la fecha en formato DD/MM/YYYY local.
+  /// Fecha legible local DD/MM/YYYY (para UI/Excel).
   String get dateString {
     final d = date.toLocal();
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
@@ -60,7 +65,8 @@ class Measurement {
       observations: observations ?? this.observations,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
-      date: date ?? this.date,
+      // invariante: siempre medianoche UTC
+      date: date != null ? utcFromLocalDate(date.toLocal()) : this.date,
     );
   }
 
@@ -72,35 +78,35 @@ class Measurement {
     'observations': observations,
     'latitude': latitude,
     'longitude': longitude,
+    // persistimos epoch en UTC
     'date': date.toUtc().millisecondsSinceEpoch,
   };
 
   factory Measurement.fromJson(Map<String, dynamic> json) {
-    final prog = _requireString(json, 'progresiva');
-    final v1m = _requireDouble(json, 'ohm1m');
-    final v3m = _requireDouble(json, 'ohm3m');
-    final obs = _requireString(json, 'observations');
+    DateTime fromEpoch(int ms) =>
+        DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
     final epochMs = _requireEpochMs(json, 'date');
+
     return Measurement(
       id: _asIntOrNull(json['id']),
-      progresiva: prog,
-      ohm1m: v1m,
-      ohm3m: v3m,
-      observations: obs,
+      progresiva: _requireString(json, 'progresiva'),
+      ohm1m: _requireDouble(json, 'ohm1m'),
+      ohm3m: _requireDouble(json, 'ohm3m'),
+      observations: _requireString(json, 'observations'),
       latitude: _asDoubleOrNull(json['latitude']),
       longitude: _asDoubleOrNull(json['longitude']),
-      date: DateTime.fromMillisecondsSinceEpoch(epochMs, isUtc: true),
+      // si viniera con hora, lo reducimos a fecha-solo
+      date: utcFromLocalDate(fromEpoch(epochMs).toLocal()),
     );
   }
 
-  /// Validaciones básicas para mostrar mensajes al usuario.
   List<String> get validationErrors {
     final e = <String>[];
     if (progresiva.trim().isEmpty) e.add('La progresiva no puede estar vacía.');
     if (ohm1m.isNaN || ohm1m < 0) e.add('El valor de 1 mΩ no puede ser negativo.');
     if (ohm3m.isNaN || ohm3m < 0) e.add('El valor de 3 mΩ no puede ser negativo.');
-    final nowUtc = DateTime.now().toUtc();
-    if (date.isAfter(nowUtc.add(const Duration(hours: 24)))) {
+    final todayUtc = utcFromLocalDate(DateTime.now());
+    if (date.isAfter(todayUtc.add(const Duration(days: 1)))) {
       e.add('La fecha no puede ser futura.');
     }
     return e;
@@ -122,10 +128,10 @@ class Measurement {
     progresiva, ohm1m, ohm3m, observations, latitude, longitude, date,
   );
 
-  // Utilidades privadas para parseo seguro.
+  // ---------- utils parse ----------
   static String _requireString(Map<String, dynamic> j, String k) {
     final v = j[k]; if (v is String) return v; if (v != null) return v.toString();
-    throw const FormatException('JSON inválido: falta un string requerido.');
+    throw const FormatException('JSON inválido: falta string requerido.');
   }
   static double _requireDouble(Map<String, dynamic> j, String k) {
     final v = j[k]; final d = _asDoubleOrNull(v);

@@ -30,3 +30,5 @@ linux/flutter/ephemeral/
 *.keystore
 
 android_bak/
+
+android/app/google-services.json

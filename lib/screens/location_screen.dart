@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/gridnote_theme.dart';
 import '../models/sheet_meta.dart';
 import '../services/location_service.dart';
+import '../utils/geo_utils.dart';
 
 class LocationScreen extends ConsumerStatefulWidget {
   const LocationScreen({super.key, required this.themeController, required this.meta});
@@ -32,9 +33,16 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
   Future<void> _load() async {
     final sp = await _sp;
     if (!mounted) return;
+    final lat = sp.getDouble(_latKey);
+    final lng = sp.getDouble(_lngKey);
+    final valid = GeoUtils.isValid(lat, lng);
+    if (!valid) {
+      await sp.remove(_latKey);
+      await sp.remove(_lngKey);
+    }
     setState(() {
-      _lat = sp.getDouble(_latKey);
-      _lng = sp.getDouble(_lngKey);
+      _lat = valid ? lat : null;
+      _lng = valid ? lng : null;
     });
   }
 
@@ -51,7 +59,6 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.deniedForever) {
-      // Usuario bloqueó definitivamente → abrir ajustes de app
       await Geolocator.openAppSettings();
       return;
     }
@@ -61,6 +68,14 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
+
+    if (!GeoUtils.isValid(pos.latitude, pos.longitude)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lectura GPS inválida. Intentá de nuevo.')),
+      );
+      return;
+    }
 
     final sp = await _sp;
     await sp.setDouble(_latKey, pos.latitude);
@@ -81,9 +96,10 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
   Widget build(BuildContext context) {
     final t = widget.themeController.theme;
     final locSvc = LocationService.instance;
-    final coordsText = (_lat == null || _lng == null)
-        ? 'Sin ubicación guardada'
-        : '${_lat!.toStringAsFixed(6)}, ${_lng!.toStringAsFixed(6)}';
+    final hasCoords = GeoUtils.isValid(_lat, _lng);
+    final coordsText = hasCoords
+        ? '${GeoUtils.fmt(_lat!)}, ${GeoUtils.fmt(_lng!)}'
+        : 'Sin ubicación guardada';
 
     return Scaffold(
       backgroundColor: t.scaffold,
@@ -116,15 +132,15 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
-                    onPressed: (_lat == null || _lng == null)
-                        ? null
-                        : () => locSvc.openInMaps(lat: _lat!, lng: _lng!),
+                    onPressed: hasCoords
+                        ? () => locSvc.openInMaps(lat: _lat!, lng: _lng!)
+                        : null,
                     icon: const Icon(Icons.map_outlined),
                     label: const Text('Abrir en mapas'),
                   ),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: (_lat == null || _lng == null) ? null : _clear,
+                    onPressed: hasCoords ? _clear : null,
                     icon: const Icon(Icons.delete_outline),
                     label: const Text('Borrar'),
                   ),
@@ -137,4 +153,3 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     );
   }
 }
-

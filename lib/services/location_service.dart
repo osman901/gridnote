@@ -1,10 +1,12 @@
+// lib/services/location_service.dart
 import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Error controlado para flujos de ubicación.
+import '../utils/geo_utils.dart';
+
 class LocationException implements Exception {
   final String message;
   const LocationException(this.message);
@@ -12,11 +14,10 @@ class LocationException implements Exception {
   String toString() => 'LocationException: $message';
 }
 
-/// Resultado de ubicación con metadatos útiles.
 class LocationFix {
   final double latitude;
   final double longitude;
-  final double? accuracyMeters; // radio 68% estimado
+  final double? accuracyMeters;
   final double? altitudeMeters;
   final double? speedMps;
   final double? headingDeg;
@@ -36,17 +37,10 @@ class LocationFix {
     this.discardedSamples = 0,
   });
 
-  /// Formato geo: URI (sirve offline en muchas apps de mapas).
-  String toGeoUri({String? label}) {
-    final lbl = label == null ? '' : '(${Uri.encodeComponent(label)})';
-    // `q=` ayuda a que ciertas apps muestren pin + etiqueta
-    return 'geo:$latitude,$longitude?q=$latitude,$longitude$lbl';
-  }
+  String toGeoUri({String? label}) =>
+      GeoUtils.geoUri(latitude, longitude, label: label).toString();
 
-  /// URL de Google Maps (online).
-  Uri toMapsUri() => Uri.parse(
-    'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
-  );
+  Uri toMapsUri() => GeoUtils.mapsUri(latitude, longitude);
 
   Map<String, dynamic> toJson() => {
     'lat': latitude,
@@ -65,7 +59,8 @@ class LocationService {
   LocationService._();
   static final LocationService instance = LocationService._();
 
-  /// Verifica servicio y permisos. Lanza [LocationException] si falla.
+  static const _getCurrentTimeout = Duration(seconds: 8);
+
   Future<void> _ensureServiceAndPermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationException('Servicio de ubicación desactivado');
@@ -80,23 +75,36 @@ class LocationService {
     }
   }
 
-  /// Posición rápida (1 lectura) con alta precisión.
+  /// Lectura rápida con timeout y fallback a lastKnown.
   Future<Position> getCurrent() async {
     await _ensureServiceAndPermission();
+    final acc = Platform.isIOS
+        ? LocationAccuracy.bestForNavigation
+        : LocationAccuracy.best;
     try {
-      final acc = Platform.isIOS
-          ? LocationAccuracy.bestForNavigation
-          : LocationAccuracy.best; // Android: PRIORITY_HIGH_ACCURACY
-      return Geolocator.getCurrentPosition(desiredAccuracy: acc);
+      final p = await Geolocator.getCurrentPosition(
+        desiredAccuracy: acc,
+        timeLimit: _getCurrentTimeout,
+      );
+      if (!GeoUtils.isValid(p.latitude, p.longitude)) {
+        throw const LocationException('Fix inválido (0,0).');
+      }
+      return p;
+    } on TimeoutException {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null && GeoUtils.isValid(last.latitude, last.longitude)) {
+        return last;
+      }
+      throw const LocationException(
+          'Tiempo de espera agotado obteniendo ubicación');
     } catch (e) {
       throw LocationException('No se pudo obtener la ubicación: $e');
     }
   }
 
-  /// Última conocida (rápida, puede estar vieja). Devuelve `null` si no hay.
   Future<Position?> getLastKnown() => Geolocator.getLastKnownPosition();
 
-  /// Fija precisa por muestreo (mejor que una sola lectura).
+  /// Muestreo de varias lecturas y promedio de las mejores.
   Future<LocationFix> getPreciseFix({
     int samples = 6,
     Duration perSampleTimeout = const Duration(seconds: 4),
@@ -118,7 +126,12 @@ class LocationService {
         final p = await Geolocator.getCurrentPosition(
           desiredAccuracy: desired,
         ).timeout(perSampleTimeout);
-        bucket.add(p);
+
+        if (_validPos(p)) {
+          bucket.add(p);
+        } else {
+          discarded++;
+        }
       } on TimeoutException {
         discarded++;
       } catch (_) {
@@ -132,16 +145,19 @@ class LocationService {
     }
 
     bucket.sort((a, b) => a.accuracy.compareTo(b.accuracy));
-    final keepNum = (bucket.length * keepBestFraction).clamp(1, bucket.length).toInt();
+    final keepNum =
+    (bucket.length * keepBestFraction).clamp(1, bucket.length).toInt();
     final kept = bucket.take(keepNum).toList();
 
-    // Centroide
     final avgLat =
         kept.map((p) => p.latitude).reduce((a, b) => a + b) / kept.length;
     final avgLng =
         kept.map((p) => p.longitude).reduce((a, b) => a + b) / kept.length;
 
-    // Dispersión robusta (MAD en metros)
+    if (!GeoUtils.isValid(avgLat, avgLng)) {
+      throw const LocationException('Fix inválido (0,0).');
+    }
+
     final dists = kept
         .map((p) => Geolocator.distanceBetween(
       avgLat,
@@ -153,7 +169,6 @@ class LocationService {
       ..sort();
     final medianDist = dists[dists.length ~/ 2];
 
-    // Precisión estimada: máx entre mejor accuracy reportada y MAD*1.4826
     final bestReported = kept.first.accuracy;
     final estAccuracy = (medianDist * 1.4826);
     final accuracy = estAccuracy > bestReported ? estAccuracy : bestReported;
@@ -166,34 +181,266 @@ class LocationService {
       altitudeMeters: ref.altitude.isFinite ? ref.altitude : null,
       speedMps: ref.speed.isFinite ? ref.speed : null,
       headingDeg: ref.heading.isFinite ? ref.heading : null,
-      timestamp: ref.timestamp ?? DateTime.now().toUtc(),
+      timestamp: ref.timestamp, // non-null
+      usedSamples: kept.length,
+      discardedSamples: discarded + (bucket.length - kept.length),
+    );
+  }
+
+  /// Ultra-fix: calienta por stream + acumula muestras, con timeout total.
+  /// Fallback a captureExact si no hay lecturas válidas.
+  Future<LocationFix> getUltraFix({
+    int maxSamples = 10,
+    Duration perSampleTimeout = const Duration(seconds: 4),
+    Duration overallTimeout = const Duration(seconds: 18),
+    double keepBestFraction = 0.6,
+  }) async {
+    assert(maxSamples > 0 && keepBestFraction > 0 && keepBestFraction <= 1);
+
+    await _ensureServiceAndPermission();
+
+    final desired = Platform.isIOS
+        ? LocationAccuracy.bestForNavigation
+        : LocationAccuracy.best;
+
+    final bucket = <Position>[];
+    var discarded = 0;
+
+    // Warm-up por stream (no bloqueante)
+    final stream = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: desired,
+        distanceFilter: 0,
+      ),
+    );
+    final sub = stream.listen((pos) {
+      if (_validPos(pos)) {
+        bucket.add(pos);
+      } else {
+        discarded++;
+      }
+    }, onError: (_) {});
+
+    final sw = Stopwatch()..start();
+    while (bucket.length < maxSamples && sw.elapsed < overallTimeout) {
+      try {
+        final p = await Geolocator.getCurrentPosition(
+          desiredAccuracy: desired,
+        ).timeout(perSampleTimeout);
+        if (_validPos(p)) {
+          bucket.add(p);
+        } else {
+          discarded++;
+        }
+      } on TimeoutException {
+        discarded++;
+      } catch (_) {
+        discarded++;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+
+    await sub.cancel();
+
+    // Fallback si no conseguimos nada
+    if (bucket.isEmpty) {
+      final alt = await captureExact(
+        warmup: const Duration(seconds: 7),
+        timeout: overallTimeout,
+        targetAccuracyMeters: 25,
+      );
+      if (alt != null && GeoUtils.isValid(alt.latitude, alt.longitude)) {
+        return alt;
+      }
+      throw const LocationException('Sin lecturas válidas');
+    }
+
+    bucket.sort((a, b) => a.accuracy.compareTo(b.accuracy));
+    final keepNum =
+    (bucket.length * keepBestFraction).clamp(1, bucket.length).toInt();
+    final kept = bucket.take(keepNum).toList();
+
+    final avgLat =
+        kept.map((p) => p.latitude).reduce((a, b) => a + b) / kept.length;
+    final avgLng =
+        kept.map((p) => p.longitude).reduce((a, b) => a + b) / kept.length;
+
+    if (!GeoUtils.isValid(avgLat, avgLng)) {
+      throw const LocationException('Fix inválido (0,0).');
+    }
+
+    final dists = kept
+        .map((p) => Geolocator.distanceBetween(
+      avgLat,
+      avgLng,
+      p.latitude,
+      p.longitude,
+    ))
+        .toList()
+      ..sort();
+    final medianDist = dists[dists.length ~/ 2];
+
+    final bestReported = kept.first.accuracy;
+    final estAccuracy = (medianDist * 1.4826);
+    final accuracy = estAccuracy > bestReported ? estAccuracy : bestReported;
+
+    final ref = kept.first;
+    return LocationFix(
+      latitude: avgLat,
+      longitude: avgLng,
+      accuracyMeters: accuracy,
+      altitudeMeters: ref.altitude.isFinite ? ref.altitude : null,
+      speedMps: ref.speed.isFinite ? ref.speed : null,
+      headingDeg: ref.heading.isFinite ? ref.heading : null,
+      timestamp: ref.timestamp, // non-null
       usedSamples: kept.length,
       discardedSamples: discarded + (bucket.length - kept.length),
     );
   }
 
   String mapsUrl(double lat, double lng) =>
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      GeoUtils.mapsUri(lat, lng).toString();
 
   Future<bool> openInMaps({
     required double lat,
     required double lng,
     String? label,
   }) async {
-    final geo = Uri.parse(
-      'geo:$lat,$lng?q=$lat,$lng${label == null ? '' : '(${Uri.encodeComponent(label)})'}',
-    );
+    if (!GeoUtils.isValid(lat, lng)) return false;
+    final geo = GeoUtils.geoUri(lat, lng, label: label);
     if (await canLaunchUrl(geo)) {
       return launchUrl(geo, mode: LaunchMode.externalApplication);
     }
-    final web = Uri.parse(mapsUrl(lat, lng));
+    final web = GeoUtils.mapsUri(lat, lng);
     return launchUrl(web, mode: LaunchMode.externalApplication);
   }
 
   String shareTextFor(double lat, double lng, {String? label}) {
-    final geo =
-        'geo:$lat,$lng?q=$lat,$lng${label == null ? '' : '(${Uri.encodeComponent(label)})'}';
-    final web = mapsUrl(lat, lng);
-    return 'Ubicación: $lat,$lng\n$geo\n$web';
+    final ok = GeoUtils.isValid(lat, lng);
+    final fLat = ok ? GeoUtils.fmt(lat) : '—';
+    final fLng = ok ? GeoUtils.fmt(lng) : '—';
+    final geo = ok ? GeoUtils.geoUri(lat, lng, label: label).toString() : '';
+    final web = ok ? GeoUtils.mapsUri(lat, lng).toString() : '';
+    return 'Ubicación: $fLat, $fLng\n$geo\n$web';
+  }
+
+  // ---------- helpers ----------
+  bool _validPos(Position p) {
+    if (!GeoUtils.isValid(p.latitude, p.longitude)) return false;
+    if (!p.accuracy.isFinite || p.accuracy <= 0) return false;
+    if (p.isMocked == true) return false;
+    return true;
+  }
+}
+
+extension LocationCapture on LocationService {
+  Future<LocationFix?> captureExact({
+    Duration warmup = const Duration(seconds: 7),
+    Duration timeout = const Duration(seconds: 15),
+    double targetAccuracyMeters = 25,
+  }) async {
+    await _ensureServiceAndPermission();
+
+    Position? best = await Geolocator.getLastKnownPosition();
+    if (best != null && !GeoUtils.isValid(best.latitude, best.longitude)) {
+      best = null;
+    }
+
+    final stream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 0,
+      ),
+    );
+
+    final completer = Completer<Position?>();
+    late final StreamSubscription<Position> sub;
+
+    Timer? warmTimer;
+    Timer? killTimer;
+
+    void finish(Position? p) async {
+      warmTimer?.cancel();
+      killTimer?.cancel();
+      await sub.cancel();
+      if (!completer.isCompleted) completer.complete(p);
+    }
+
+    sub = stream.listen((pos) {
+      if (pos.isMocked == true) return;
+      if (!GeoUtils.isValid(pos.latitude, pos.longitude)) return;
+
+      if (best == null || pos.accuracy < best!.accuracy) {
+        best = pos;
+        if (pos.accuracy <= targetAccuracyMeters) {
+          finish(best);
+        }
+      }
+    }, onError: (_) async {
+      try {
+        final p = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.bestForNavigation,
+          timeLimit: const Duration(seconds: 5),
+        );
+        if (GeoUtils.isValid(p.latitude, p.longitude)) {
+          finish(p);
+        } else {
+          finish(best);
+        }
+      } catch (_) {
+        finish(best);
+      }
+    });
+
+    warmTimer = Timer(warmup, () {
+      if (best != null && best!.accuracy <= targetAccuracyMeters) {
+        finish(best);
+      }
+    });
+
+    killTimer = Timer(timeout, () => finish(best));
+
+    // Espera principal + fallbacks sin catchError que devuelva null inválido
+    Position? primary;
+    try {
+      primary = await completer.future;
+    } catch (_) {
+      primary = null;
+    }
+
+    Position? fast;
+    if (primary == null) {
+      try {
+        fast = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.bestForNavigation,
+          timeLimit: const Duration(seconds: 5),
+        );
+      } catch (_) {
+        fast = null;
+      }
+    }
+
+    final pos = primary ?? fast ?? best;
+
+    if (pos == null || !GeoUtils.isValid(pos.latitude, pos.longitude)) {
+      return null;
+    }
+
+    return LocationFix(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      accuracyMeters: pos.accuracy,
+      altitudeMeters: pos.altitude.isFinite ? pos.altitude : null,
+      speedMps: pos.speed.isFinite ? pos.speed : null,
+      headingDeg: pos.heading.isFinite ? pos.heading : null,
+      timestamp: pos.timestamp, // non-null
+      usedSamples: 1,
+      discardedSamples: 0,
+    );
+  }
+
+  Future<LocationFix?> freezeIfEmpty(LocationFix? existing) async {
+    if (existing != null) return existing;
+    return captureExact();
   }
 }

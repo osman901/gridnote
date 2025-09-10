@@ -1,9 +1,8 @@
 // lib/screens/photos_screen.dart
 import 'dart:io';
-import 'dart:ui';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,18 +13,31 @@ import '../models/sheet_meta.dart';
 import '../services/photo_service.dart';
 import '../theme/gridnote_theme.dart';
 
-class PhotosScreen extends ConsumerStatefulWidget {
-  const PhotosScreen({super.key, required this.themeController, required this.meta});
+class PhotosScreen extends StatefulWidget {
+  const PhotosScreen({
+    super.key,
+    required this.themeController,
+    required this.meta,
+  });
+
   final GridnoteThemeController themeController;
   final SheetMeta meta;
 
   @override
-  ConsumerState<PhotosScreen> createState() => _PhotosScreenState();
+  State<PhotosScreen> createState() => _PhotosScreenState();
 }
 
-class _PhotosScreenState extends ConsumerState<PhotosScreen> {
-  List<PhotoAttachment> _items = [];
+class _PhotosScreenState extends State<PhotosScreen> {
+  List<PhotoAttachment> _items = const [];
   bool _loading = true;
+
+  GridnoteTheme get t => widget.themeController.theme;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
 
   Future<void> _refresh() async {
     final list = await PhotoService.instance.list(widget.meta.id);
@@ -36,13 +48,6 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _refresh();
-  }
-
-  // Deriva el rowId a partir del path si el modelo no lo tiene
   String _rowLabelFromPath(PhotoAttachment a) {
     final segs = p.split(a.path);
     final i = segs.indexOf(widget.meta.id);
@@ -55,20 +60,16 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.themeController.theme;
-    final messenger = ScaffoldMessenger.of(context);
-
     return Scaffold(
       backgroundColor: t.scaffold,
       appBar: AppBar(title: Text('Fotos • ${widget.meta.name}')),
-      floatingActionButton: _fab(t),
+      floatingActionButton: _fab(),
       body: Stack(
         children: [
-          // Fondo glass
           Positioned.fill(
             child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(color: Colors.black.withValues(alpha: 0.25)),
+              imageFilter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(color: Colors.black.withValues(alpha: .18)),
             ),
           ),
           if (_loading)
@@ -94,7 +95,8 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
                       if (await file.exists()) {
                         await OpenFilex.open(a.path);
                       } else {
-                        messenger.showSnackBar(
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Archivo no encontrado')),
                         );
                       }
@@ -113,7 +115,6 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
                               child: Center(child: Icon(Icons.broken_image_outlined)),
                             ),
                           ),
-                          // degradé para info
                           Align(
                             alignment: Alignment.bottomCenter,
                             child: Container(
@@ -122,17 +123,13 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  colors: [Color(0x00000000), Color(0x55000000)],
+                                  colors: [Color(0x00000000), Color(0x66000000)],
                                 ),
                               ),
                               alignment: Alignment.centerLeft,
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               child: Text(
-                                // usa a.rowId si existe; si no, lo deriva del path
-                                // ignore: unnecessary_null_comparison
-                                (a is dynamic && (a as dynamic).rowId != null)
-                                    ? ((a as dynamic).rowId as String? ?? '')
-                                    : _rowLabelFromPath(a),
+                                _rowLabelFromPath(a),
                                 style: const TextStyle(color: Colors.white, fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -150,7 +147,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
     );
   }
 
-  Widget _fab(GridnoteTheme t) => PopupMenuButton<String>(
+  Widget _fab() => PopupMenuButton<String>(
     itemBuilder: (_) => const [
       PopupMenuItem(
         value: 'cam',
@@ -162,9 +159,16 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
       ),
     ],
     onSelected: (v) async {
-      if (v == 'cam') await PhotoService.instance.addFromCamera(widget.meta.id);
-      if (v == 'gal') await PhotoService.instance.addFromGallery(widget.meta.id);
-      await _refresh();
+      try {
+        if (v == 'cam') await PhotoService.instance.addFromCamera(widget.meta.id);
+        if (v == 'gal') await PhotoService.instance.addFromGallery(widget.meta.id);
+        await _refresh();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()),
+        ));
+      }
     },
     child: FloatingActionButton(
       backgroundColor: t.accent,
@@ -228,7 +232,8 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
 
   Future<bool> _saveToDownloads(File src) async {
     try {
-      final dir = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      final dir = await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
       final name = p.basename(src.path);
       final dst = File(p.join(dir.path, name));
       await dst.writeAsBytes(await src.readAsBytes(), flush: true);

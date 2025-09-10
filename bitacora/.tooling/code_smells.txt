@@ -1,0 +1,1 @@
+C:\Users\marco\StudioProjects\Gridnote\bitacora\lib\data\app_database.g.dart:516:class Photo extends DataClass implements Insertable<Photo> {
