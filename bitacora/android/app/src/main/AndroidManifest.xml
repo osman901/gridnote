@@ -1,46 +1,54 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.gridnote.bitacora">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ===== Permisos ===== -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Hardware opcional -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
-    <!-- Ubicación (primer plano). Agregar ACCESS_BACKGROUND_LOCATION solo si la usás. -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/> -->
+    <!-- Red (debug/hot reload, APIs) -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Cámara / medios -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- Android 13+ (scoped media) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <!-- (opcional) acceso a ubicación embebida en EXIF -->
-    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
-    <!-- Compat para Android 12L- -->
+    <!-- Cámara / micrófono -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Ubicación (geolocator) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Si vas a rastrear ubicación en 2° plano en Android 10+ descomenta:
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    -->
+
+    <!-- Foreground services (Android 14+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Si hacés captura en 1° plano con micrófono/cámara, podés sumar:
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    -->
+
+    <!-- Notificaciones (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Acceso a medios (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- Compatibilidad storage para APIs viejas -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32"/>
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
-    <!-- Notificaciones (Android 13+) si las usás -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
-    <!-- Aclara que no requerís GPS duro -->
-    <uses-feature
-        android:name="android.hardware.location.gps"
-        android:required="false"/>
-    <!-- Cámara no obligatoria -->
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="false"/>
+    <!-- Vibración -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
-        android:label="Bitácora"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
-        android:enableOnBackInvokedCallback="true"
-        tools:targetApi="33">
+        android:label="bitacora"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
 
         <activity
             android:name=".MainActivity"
@@ -48,42 +56,36 @@
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
+            android:windowSoftInputMode="adjustResize">
 
+            <!-- Tema inicial mientras arranca Flutter -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- FileProvider para compartir/abrir archivos (usa applicationId para flavors) -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"/>
-        </provider>
-
-        <!-- Requerido por Flutter -->
+        <!-- No borrar: Flutter lo usa para registrar plugins -->
         <meta-data
             android:name="flutterEmbedding"
-            android:value="2"/>
+            android:value="2" />
+
+        <!-- (Opcional) Fijar puerto del VM Service para attach en debug
+        <meta-data android:name="io.flutter.vmServicePort" android:value="50300" />
+        -->
     </application>
 
-    <!-- Queries usados por Flutter/Share para acciones de texto -->
+    <!-- Visibilidad de paquetes (Process Text del engine) -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 </manifest>
